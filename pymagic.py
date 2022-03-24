@@ -13,3 +13,4 @@ import mimetypes
 f = magic.Magic(keep_going=False,uncompress=False,extension=False)
 print(f.from_file(sys.argv[1]))
 
+
