@@ -177,12 +177,12 @@ cd ../
 #python3 bitcoin_salvager.py scalpel-output/
 
 # CLEAN UP
-# Remove the image we made (they didn't provide one) unless they want us to keep it
-if [[ $keep_image -eq 1 && $image_given -eq 0]]; then
-	echo "Keeping Tomb Raider Image $image since requested by user."
-else
+# If they didn't provide an image, then we have a TR Image. We delete it if they don't specify otherwise.
+if [[ $image_given -eq 0 && $keep_image -eq 0 ]]; then
 	echo "Removing Tomb Raider $image to save disk space."
 	rm $image
+elif [[ $image_given -eq 0 && $keep_image -eq 1 ]]; then
+	echo "Keeping Tomb Raider Image $image since requested by user."
 fi
 
 
