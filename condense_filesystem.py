@@ -74,21 +74,16 @@ USE THIS UNDER THE ASSUMPTION THAT IT WILL MODIFY FILE NAME AND/OR LOCATION OF A
 import sys
 import os
 import re
+import shutil
+from tqdm import tqdm
 
 
-def files(dir):
-    # Return a list of all filenames in directory - not a generator, since we will be modifying the filenames.
+def fpaths(dir):
+    # Return a list of all filepaths in directory - not a generator, since we will be modifying the filenames.
     l = []
     for root,_,files in os.walk(dir):
         for f in files:
             l.append(os.path.join(root,f))
-    return l
-
-def dirs(directory):
-    # Return all directories in given directory
-    l = []
-    for root,_,__ in os.walk(directory, topdown=False):
-        l.append(root)
     return l
 
 def safemv(src, dst):
@@ -135,28 +130,16 @@ def localize(fpath, root):
     return fpath.replace(root, "")
 
 def condense(root):
-    # Given a root folder, iterate through all folders and files to rename and move the files as documented.
-    for dir in dirs(root):
-        # Sanitize it here so we don't have to repeat costly regexes on the directory for every file in it.
-        # This is why we do this in a more roundabout way than just iterating through filepaths.
-        # TODO: change later if this isn't working out.
-        sanitized_dir = sanitize(localize(dir, root))
-        #for fpath in files(dir):
-        for fname in os.listdir(dir):
-            fpath = dir + "/" + fname
-            if os.path.isfile(fpath):
-                condensed_fname = sanitized_dir + sanitize(fname)
-                safemv(fpath, root + "/" + condensed_fname)
+    # Given a root folder, iterate through all folders and files to rename
+    # and move the files as documented above.
+    for fpath in tqdm(fpaths(root)):
+        safemv(fpath, root + "/" + sanitize(localize(fpath, root)))
 
-        # Done iterating through directory, remove it
-        # This will fail if the directory was not successfully emptied, we leave it if that has occurred
-        # for the user to examine.
-        try:
-            os.remove(dir)
-        except OSError:
-            print("Unable to remove directory, leaving as is.")
-
-
+    # Remove any remaining directories if they are empty (we double check)
+    for dir in os.listdir(root):
+        dir = root + "/" + dir
+        if os.path.isdir(dir) and len(fpaths(dir)) == 0:
+            shutil.rmtree(dir)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
