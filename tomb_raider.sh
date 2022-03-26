@@ -165,6 +165,12 @@ fi
 
 cd ../
 
+# Condense Filesystem - Remove all subdirectories in photorec/ and testdisk/, instead converting
+# all filenames into sanitized versions which also contain their original filepath in the filename.
+echo "Condensing result Testdisk Filesystem"
+python3 $original_dir/condense_filesystem.py $(realpath testdisk/)
+echo "Condensing result PhotoRec Filesystem"
+python3 $original_dir/condense_filesystem.py $(realpath photorec/)
 
 
 # Scalpel - Carving out parts that match private key hex patterns
