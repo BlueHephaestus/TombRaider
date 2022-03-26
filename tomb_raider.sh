@@ -86,17 +86,22 @@ fi
 # If not given, will use default name of disk.img in output directory.
 echo "Preparing output directories."
 original_dir=$(pwd)
+safecopy_dir="$output_dir/safecopy"
+testdisk_dir="$output_dir/testdisk"
+photorec_dir="$output_dir/photorec"
+
 mkdir -p $output_dir
 if [[ $image_given -eq 0 ]]; then
-	mkdir -p "$output_dir/safecopy"
+	mkdir -p safecopy_dir
 fi
-mkdir -p "$output_dir/testdisk"
-mkdir -p "$output_dir/photorec"
-cd $output_dir
+mkdir -p $testdisk_dir
+mkdir -p $photorec_dir
+
 
 # SAFECOPY - Imaging as much of drive as possible
 # From /dev/sdX to disk.img
 # WILL SKIP IF THE IMAGE FILE IS PROVIDED
+cd $safecopy_dir
 if [[ $image_given -eq 0 ]]; then # get an image from the drive, since we don't have one yet
 	image=$(realpath "$output_dir/disk.img") # Default image loc
 	echo "Imaging drive $drive to new image $image. DO NOT MOUNT YOUR DEVICE."
@@ -115,7 +120,7 @@ fi
 
 echo "Attempting to obtain Filesystem"
 # Filesystem directory
-cd testdisk
+cd $testdisk_dir
 
 # Get the filesystem on the drive to retain any file metadata and organization, if possible
 # MMLS - Get the number of allocated partitions on disk.img, if any (has to be alloc to have filesystem)
@@ -137,11 +142,8 @@ do
 	fi
 	((i++))
 done
-cd ../
 
 echo "Recovering / Undeleting files on $image"
-# Files Recovered Directory
-cd photorec
 
 # Recover / undelete all filetypes, without filesystem structure. Uses PhotoRec with all usual filetypes enabled.
 # There are about 5 that it doesn't enable by default, and if you really want those types of files I recommend
@@ -159,20 +161,25 @@ cd photorec
 # expert - no
 # lowmem - no
 
+cd $photorec_dir
 if [[ $dryrun -eq 0 ]]; then
 	photorec /debug /log /d . /cmd $image partition_none,options,keep_corrupted_file,paranoid,fileopt,everything,enable,search
 fi
 
-cd ../
 
+cd $output_dir
 # Condense Filesystem - Remove all subdirectories in photorec/ and testdisk/, instead converting
 # all filenames into sanitized versions which also contain their original filepath in the filename.
 echo "Condensing result Testdisk Filesystem"
-python3 $original_dir/condense_filesystem.py $(realpath testdisk/)
+python3 $original_dir/condense_filesystem.py $testdisk_dir
 echo "Condensing result PhotoRec Filesystem"
-python3 $original_dir/condense_filesystem.py $(realpath photorec/)
+python3 $original_dir/condense_filesystem.py $photorec_dir
 
-
+# Index newly condensed filesystems, mapping filenames to hashes of file contents
+echo "Indexing Testdisk Filesystem"
+python3 $original_dir/index_filesystem.py $testdisk_dir
+echo "Indexing Photorec Filesystem"
+python3 $original_dir/index_filesystem.py $photorec_dir
 # Scalpel - Carving out parts that match private key hex patterns
 #echo "Searching through ALL bytes on image for any matching private key patterns."
 #scalpel disk.img
