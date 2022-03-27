@@ -178,8 +178,50 @@ python3 $original_dir/condense_filesystem.py $photorec_dir
 # Index newly condensed filesystems, mapping filenames to hashes of file contents
 echo "Indexing Testdisk Filesystem"
 python3 $original_dir/index_filesystem.py $testdisk_dir
-echo "Indexing Photorec Filesystem"
+echo "Indexing PhotoRec Filesystem"
 python3 $original_dir/index_filesystem.py $photorec_dir
+
+# Remove duplicates from both filesystems, using indexes
+testdisk_index=$output_dir/testdisk.index
+photorec_index=$output_dir/photorec.index
+testdisk_n=$(cat $testdisk_index | wc -l)
+photorec_n=$(cat $photorec_index | wc -l)
+
+echo "Indexed $testdisk_n files in Testdisk Filesystem"
+echo "Indexed $photorec_n files in PhotoRec Filesystem"
+
+echo "Removing Duplicates from Testdisk Filesystem"
+python3 $original_dir/remove_indexed_duplicates.py $testdisk_dir $testdisk_index
+echo "Removing Duplicates from PhotoRec Filesystem"
+python3 $original_dir/remove_indexed_duplicates.py $photorec_dir $photorec_index
+
+fs_partitions=$((`mmls -a $image | wc -l`-5))
+new_testdisk_n=$(cat $testdisk_index | wc -l)
+new_photorec_n=$(cat $photorec_index | wc -l)
+echo "Removed $((testdisk_n-new_testdisk_n)) Duplicate Files from Testdisk Filesystem, \
+there are now $new_testdisk_n files in the Testdisk Filesystem"
+echo "Removed $((photorec_n-new_photorec_n)) Duplicate Files from PhotoRec Filesystem, \
+there are now $new_photorec_n files in the PhotoRec Filesystem"
+testdisk_n=new_testdisk_n
+photorec_n=new_photorec_n
+
+# Finally merge the two, in a special way. Here's how. If Testdisk recovered files/data from the image,
+# then the files/data it recovered will have filesystem metadata - their filename and location
+# of each file. PhotoRec usually does not have any of this data for the files it's recovered, either because
+# of how it recovers them, or simply because when a filesystem "deletes" a file, it deletes its pointers and labels
+# for the file, i.e. its name and location on the filesystem.
+#
+# So because of this, if we find a duplicate pair - a file that is in testdisk once and in photorec once, we
+# discard the one from photorec since testdisk will have greater than or equal to the metadata that photorec has.
+echo "Merging Testdisk and PhotoRec Filesystems and Removing Pair Duplicates"
+
+fs_dir=$output_dir/filesystem/
+fs_index=$output_dir/filesystem.index
+mkdir -p $fs_dir
+
+python3 $original_dir/merge_testdisk_photorec.py $testdisk_dir $testdisk_index $photorec_dir $photorec_index $fs_dir $fs_index
+#fs_n=$(cat $fs_index | wc -l)
+
 # Scalpel - Carving out parts that match private key hex patterns
 #echo "Searching through ALL bytes on image for any matching private key patterns."
 #scalpel disk.img

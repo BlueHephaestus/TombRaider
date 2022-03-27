@@ -5,6 +5,7 @@ Various multi-use utilities and tools for helping work with and manipulate files
 """
 
 import os
+from tqdm import tqdm
 
 def fpaths(dir):
     # Return a list of all filepaths in directory - not a generator.
@@ -30,3 +31,11 @@ def localize(fpath, root):
 
     # Args are properly sanitized, we good to go.
     return fpath.replace(root, "")
+
+def write_index(index, index_fname):
+    # Write updated index to disk at index_fname.
+    # NOTE: Uses index format of digest: fname, and writes to format "fname, digest".
+    # We don't use a read-index because of how often the method of reading is modified per-file.
+    with open(index_fname, "w") as f:
+        for digest,fname in index.items():
+            f.write(f"{fname}, {digest}\n")
