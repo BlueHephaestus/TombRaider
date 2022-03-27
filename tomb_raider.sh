@@ -205,7 +205,7 @@ there are now $new_photorec_n files in the PhotoRec Filesystem"
 testdisk_n=new_testdisk_n
 photorec_n=new_photorec_n
 
-# Finally merge the two, in a special way. Here's how. If Testdisk recovered files/data from the image,
+# Finally merge the two filesystems, in a special way. Here's how. If Testdisk recovered files/data from the image,
 # then the files/data it recovered will have filesystem metadata - their filename and location
 # of each file. PhotoRec usually does not have any of this data for the files it's recovered, either because
 # of how it recovers them, or simply because when a filesystem "deletes" a file, it deletes its pointers and labels
@@ -220,7 +220,40 @@ fs_index=$output_dir/filesystem.index
 mkdir -p $fs_dir
 
 python3 $original_dir/merge_testdisk_photorec.py $testdisk_dir $testdisk_index $photorec_dir $photorec_index $fs_dir $fs_index
-#fs_n=$(cat $fs_index | wc -l)
+fs_n=$(cat $fs_index | wc -l)
+echo "Removed $(((testdisk_n+photorec_n)-fs_n)) Pair Duplicate Files"
+echo "Merged $testdisk_n Testdisk files and $photorec_n PhotoRec files into new Tomb Filesystem with $fs_n files."
+
+# Remove any files in the "known good" hashsets from NIST NSRL.
+# We check our indexes for any files in these hashsets, with the knowledge that these are files which were
+# either already on the operating system at initialization, or are otherwise common and usual programs we'd
+# expect to find on a hard drive, and we don't care about (e.g. Photoshop, Microsoft Word, Minesweeper).
+# Of course if they've used those programs and they keep files, we'll still have those, which is a good and bad
+# thing, because it means the boring programs may still have files laying around, but it also means that
+# we'll still know what data was produced or if they *used* bad programs which were also known.
+# Essentially, this removes static non-relevant data
+echo "Comparing Tomb Filesystem files to NSRL Known Files and Removing Known files"
+nsrl_md5s=$original_dir/nsrl.md5s #md5s because it only has md5s, not an index
+python3 $original_dir/remove_known_files.py $fs_index $nsrl_md5s
+
+new_fs_n=$(cat $fs_index | wc -l)
+echo "Removed $((fs_n-new_fs_n)) NSRL Known Files from Tomb Filesystem, \
+there are now $new_fs_n files in the Tomb Filesystem"
+fs_n=new_fs_n
+
+# Do it again on any personal MD5 hashsets we have
+echo "Comparing Tomb Filesystem files to HashSets.com Known Files and Removing Known files"
+hashsets_md5s=$original_dir/hashsets.md5s #md5s because it only has md5s, not an index
+python3 $original_dir/remove_known_files.py $fs_index $hashsets_md5s
+
+new_fs_n=$(cat $fs_index | wc -l)
+echo "Removed $((fs_n-new_fs_n)) Hashsets.com Known Files from Tomb Filesystem, \
+there are now $new_fs_n files in the Tomb Filesystem"
+fs_n=new_fs_n
+
+# Filter remaining files, determining their filetype and using our blacklist file to remove any matching
+# extensions and/or classes which we want to disregard.
+python3 $original_dir/filter_files
 
 # Scalpel - Carving out parts that match private key hex patterns
 #echo "Searching through ALL bytes on image for any matching private key patterns."

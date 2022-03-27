@@ -37,5 +37,5 @@ def write_index(index, index_fname):
     # NOTE: Uses index format of digest: fname, and writes to format "fname, digest".
     # We don't use a read-index because of how often the method of reading is modified per-file.
     with open(index_fname, "w") as f:
-        for digest,fname in index.items():
+        for digest,fname in tqdm(index.items()):
             f.write(f"{fname}, {digest}\n")
