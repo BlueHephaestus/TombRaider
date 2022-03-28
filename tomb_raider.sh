@@ -239,17 +239,17 @@ python3 $original_dir/remove_known_files.py $fs_index $nsrl_md5s
 new_fs_n=$(cat $fs_index | wc -l)
 echo "Removed $((fs_n-new_fs_n)) NSRL Known Files from Tomb Filesystem, \
 there are now $new_fs_n files in the Tomb Filesystem"
-fs_n=new_fs_n
 
 # Do it again on any personal MD5 hashsets we have
 echo "Comparing Tomb Filesystem files to HashSets.com Known Files and Removing Known files"
+fs_n=$(cat $fs_index | wc -l)
 hashsets_md5s=$original_dir/hashsets.md5s #md5s because it only has md5s, not an index
 python3 $original_dir/remove_known_files.py $fs_index $hashsets_md5s
 
 new_fs_n=$(cat $fs_index | wc -l)
+
 echo "Removed $((fs_n-new_fs_n)) Hashsets.com Known Files from Tomb Filesystem, \
 there are now $new_fs_n files in the Tomb Filesystem"
-fs_n=new_fs_n
 
 # Filter remaining files, determining their filetype and using our blacklist file to remove any matching
 # extensions and/or classes which we want to disregard.
