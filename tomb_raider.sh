@@ -85,7 +85,7 @@ fi
 # Will not move the image file if one is already given.
 # If not given, will use default name of disk.img in output directory.
 echo "Preparing output directories."
-original_dir=$(pwd)
+original_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 safecopy_dir="$output_dir/safecopy"
 testdisk_dir="$output_dir/testdisk"
 photorec_dir="$output_dir/photorec"
@@ -244,7 +244,7 @@ there are now $new_fs_n files in the Tomb Filesystem"
 echo "Comparing Tomb Filesystem files to HashSets.com Known Files and Removing Known files"
 fs_n=$(cat $fs_index | wc -l)
 hashsets_md5s=$original_dir/hashsets.md5s #md5s because it only has md5s, not an index
-#python3 $original_dir/remove_known_files.py $fs_index $hashsets_md5s
+python3 $original_dir/remove_known_files.py $fs_index $hashsets_md5s
 
 new_fs_n=$(cat $fs_index | wc -l)
 
@@ -253,8 +253,9 @@ there are now $new_fs_n files in the Tomb Filesystem"
 
 # Filter remaining files, determining their filetype and using our blacklist file to remove any matching
 # extensions and/or classes which we want to disregard.
+# By default does not use a blacklist
 echo "Classifying files by Filetype and Sorting Tomb Filesystem"
-python3 $original_dir/filter_files.py $fs_dir $fs_index $original_dir/blacklist
+python3 $original_dir/filter_files.py $fs_dir $fs_index
 
 # Scalpel - Carving out parts that match private key hex patterns
 #echo "Searching through ALL bytes on image for any matching private key patterns."
