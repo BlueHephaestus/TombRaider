@@ -78,6 +78,9 @@ import shutil
 from filesystem_utils import *
 from tqdm import tqdm
 
+# Number of characters to limit our filenames to. We keep it at 240 so we still have some room for renaming
+# before reaching 255 characters, when we later sort into subdirectories.
+FPATH_TRIM_LENGTH = 240
 def safemv(src, dst):
     # Move file at location src to location dst, renaming it if needed to avoid any destruction of data.
     if os.path.exists(dst) and src != dst:
@@ -102,6 +105,7 @@ def sanitize(fpath):
     fpath = re.sub(r'[-\s]', '_', fpath, flags=re.UNICODE)
     fpath = re.sub(r'/', '|', fpath, flags=re.UNICODE)
     fpath = re.sub(r'[^a-zA-Z0-9._|]', '?', fpath, flags=re.UNICODE)
+    fpath = fpath[:FPATH_TRIM_LENGTH]
     return fpath
 
 

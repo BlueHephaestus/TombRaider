@@ -122,7 +122,13 @@ def filter_files(root, index_fname, blacklist_fname=None):
                     # If it's not plaintext then we put it here.
                     subdir = "Unsupported_Filedata"
 
-            # There are no other cases - trust me, I spent hours writing out the cases.
+            # There are no other combinations - trust me, I spent hours writing out the cases.
+
+            # Sort images roughly so we can filter out a lot of icons
+            if subdir == "Images":
+                if small_image(fname):
+                    subdir = "Small_Images"
+
 
             if subdir not in subdir_counts:
                 subdir_counts[subdir] = 1

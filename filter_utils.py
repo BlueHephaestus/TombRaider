@@ -24,6 +24,9 @@ labels = ["Encrypted",   "Archives",    "Videos",    "Audio",    "Images",    "P
 
 # get filedata string, check each tag in string against filetype tags
 
+# Byte threshold which we use to determine if an image is "Small"
+SMALL_IMG_THRESHOLD = 50000 #50kb
+
 # Pymagic to determine info from file contents (and magic numbers hence the name)
 get_info = magic.Magic(keep_going=False, uncompress=False, extension=False)
 
@@ -95,3 +98,11 @@ def plaintext(fname):
     # Check if plaintext. Helpful for sorting out the plaintext ones.
     info = get_info.from_file(fname)
     return "ASCII text" in info
+
+# def less_than(fname, bytes):
+#     # Check if smaller than 50kb in size
+#     return os.path.getsize(fname)
+#     small_image
+def small_image(fname):
+    # Check if smaller than our small image size threshold
+    return os.path.getsize(fname) < SMALL_IMG_THRESHOLD
