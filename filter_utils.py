@@ -13,7 +13,7 @@ import magic
 # Extension checks ordered in rough estimate of complexity (or perhaps average entropy) of filetype
 exts = [ENCRYPTION_EXTS, ARCHIVE_EXTS, VIDEO_EXTS, AUDIO_EXTS, IMAGE_EXTS, PROGRAM_EXTS, DOCUMENT_EXTS, IRRELEVANT_EXTS, MISC_EXTS]
 tags = [ENCRYPTION_TAGS, ARCHIVE_TAGS, VIDEO_TAGS, AUDIO_TAGS, IMAGE_TAGS, PROGRAM_TAGS, DOCUMENT_TAGS, IRRELEVANT_TAGS, MISC_TAGS]
-labels = ["Encrypted",   "Archive",    "Video",    "Audio",    "Image",    "Program",    "Document",    "Irrelevant",    "Misc"]
+labels = ["Encrypted",   "Archives",    "Videos",    "Audio",    "Images",    "Programs",    "Documents",    "Irrelevant",    "Misc"]
 
 # get extension, check if extension in groupings
 
@@ -29,7 +29,7 @@ get_info = magic.Magic(keep_going=False, uncompress=False, extension=False)
 
 def filetype_from_ext(fname):
     # Determine which grouping the ext belongs to (can only belong to one)
-    ext = os.path.splitext(fname)[-1]
+    ext = os.path.splitext(fname)[-1].lower()
     if len(ext) <= 1:
         # No extension, or just a dot, unknown
         return "Unknown"
@@ -91,3 +91,7 @@ def filetype_from_info(fname):
     # Has info but it's not in any of our lists, unsupported
     return "Unsupported"
 
+def plaintext(fname):
+    # Check if plaintext. Helpful for sorting out the plaintext ones.
+    info = get_info.from_file(fname)
+    return "ASCII text" in info

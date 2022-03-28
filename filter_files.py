@@ -24,12 +24,7 @@ def filter_files(root, index_fname, blacklist_fname=None):
     # Attempt to determine filetype and then sort the files by filetype, optionally filtering them out
     # by the blacklisted extensions/filetypes if a blacklist is provided.
 
-    # Get files from index and ignore digests
-    files = []
-    with open(index_fname, "r") as f:
-        for line in tqdm(f.readlines()):
-            fname = line.strip().split(", ")[0]
-            files.append(fname)
+    subdir_counts = {}
 
     # Get blacklist if there is one (will be empty if not)
     blacklist =set({})
@@ -64,27 +59,103 @@ def filter_files(root, index_fname, blacklist_fname=None):
         3. If the info is not matched by any of our rules, the info_class is UNSUPPORTED.
         
     We then use the ext_class and data_class to choose the final location of the file.
+    
+    We also have some special cases for plaintext files, because EVERYTHING IS PLAINTEXT AAAAAA
     """
-    for fname in files:
-        # Determine Ext class
-        ext_class = filetype_from_ext(fname)
+    # Helper lambdas
+    known = lambda c: c != "Unknown" and c != "Unsupported"
+    unknown = lambda c: c == "Unknown"
+    unsupported = lambda c: c == "Unsupported"
+    index = {}
+    with open(index_fname, "r") as f:
+        for line in tqdm(f.readlines()):
+            fname, digest = line.strip().split(", ")
 
-        # Determine Info class
-        info_class = filetype_from_info(fname)
+            # Determine Ext class
+            ext_class = filetype_from_ext(fname)
 
-        # We now have ext class and info class.
+            # Determine Info class
+            info_class = filetype_from_info(fname)
 
+            # We now have ext class and info class.
+            # We now sort them - if the classes agree, they go in that class. If they don't, then we have a lot
+            # of possible conditions for which we handle for how they get sorted, detailed in the below conditionals.
+            if ext_class == info_class:
+                # Easy case, put it in the class
+                subdir = ext_class
 
+            elif known(ext_class) and known(info_class) and ext_class != info_class:
+                # Both known, but mismatch
+                subdir = "Mismatches"
 
+            elif known(ext_class) and unsupported(info_class):
+                # We know the ext but data is something else
+                if plaintext(fname):
+                    # Some type of text file, trust the extension in this case
+                    subdir = ext_class
+                else:
+                    # If it's not plaintext then we put it here.
+                    subdir = "Unsupported_Filedata"
 
+            elif known(ext_class) and unknown(info_class):
+                # We know the ext but not the data
+                subdir = "Unknown_Filedata"
 
-    # Write the updated index back to disk, we've already removed all duplicate files.
+            elif unsupported(ext_class) and known(info_class):
+                # We know the data but ext is something else
+                subdir = "Unsupported_Extension"
+
+            elif unsupported(ext_class) and unknown(info_class):
+                # Has some extension but no info obtained, unknown data
+                subdir = "Unknown"
+
+            elif unknown(ext_class) and known(info_class):
+                # We trust data when we are lacking an extension
+                subdir = info_class
+
+            elif unknown(ext_class) and unsupported(info_class):
+                # No extension, filedata is something unsupported
+                if plaintext(fname):
+                    # Some type of text file, store in special directory
+                    subdir = "Unsupported_Text"
+                else:
+                    # If it's not plaintext then we put it here.
+                    subdir = "Unsupported_Filedata"
+
+            # There are no other cases - trust me, I spent hours writing out the cases.
+
+            if subdir not in subdir_counts:
+                subdir_counts[subdir] = 1
+            else:
+                subdir_counts[subdir] += 1
+
+            if subdir not in blacklist:
+                # We now have subdirectory, move the file to that and make the directory if not made yet.
+                # we don't create all the directories at first since it's very plausible that some won't be used
+                subdir = root + "/" + subdir
+                dst_fname = subdir + "/" + os.path.basename(fname)
+                if not os.path.isdir(subdir):
+                    os.mkdir(subdir)
+
+                # Finally move the file
+                os.replace(fname, dst_fname)
+
+                # Store in index
+                index[digest] = dst_fname
+
+            else:
+                # Blacklisted, remove it
+                os.remove(fname)
+
+    # Write the updated index back to disk, we've moved everything
     write_index(index, index_fname)
 
-    # print(magic.coerce_filename("/home/media/blue/001-SA-N-87/recup_dir.1/report.xml"))
-    # print(magic.from_file(sys.argv[1],mime=True))
-    print(f.from_file(sys.argv[1]))
-
+    # Print distribution of classes
+    print("Found and sorted the following distribution of classes:")
+    counts = list((subdir,count) for subdir,count in subdir_counts.items())
+    sorted_counts = sorted(counts, key=lambda x:x[1])
+    for subdir, count in sorted_counts:
+        print(f"\t{subdir}: {count} Files")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3 and len(sys.argv) != 4:
@@ -92,8 +163,9 @@ if __name__ == "__main__":
 
     root = sys.argv[1]
     index = sys.argv[2]
+    if root[-1] == "/": root = root[:-1]
     if len(sys.argv) == 4:
         blacklist = sys.argv[3]
-        filter_files(root, index, blacklist=blacklist)
+        filter_files(root, index, blacklist_fname=blacklist)
     else:
         filter_files(root, index)

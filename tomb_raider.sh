@@ -163,7 +163,7 @@ echo "Recovering / Undeleting files on $image"
 
 cd $photorec_dir
 if [[ $dryrun -eq 0 ]]; then
-	photorec /debug /log /d . /cmd $image partition_none,options,keep_corrupted_file,paranoid,fileopt,everything,enable,search
+	photorec /debug /log /d $photorec_dir/photorec /cmd $image partition_none,options,keep_corrupted_file,paranoid,fileopt,everything,enable,search
 fi
 
 
@@ -202,8 +202,8 @@ echo "Removed $((testdisk_n-new_testdisk_n)) Duplicate Files from Testdisk Files
 there are now $new_testdisk_n files in the Testdisk Filesystem"
 echo "Removed $((photorec_n-new_photorec_n)) Duplicate Files from PhotoRec Filesystem, \
 there are now $new_photorec_n files in the PhotoRec Filesystem"
-testdisk_n=new_testdisk_n
-photorec_n=new_photorec_n
+testdisk_n=$new_testdisk_n
+photorec_n=$new_photorec_n
 
 # Finally merge the two filesystems, in a special way. Here's how. If Testdisk recovered files/data from the image,
 # then the files/data it recovered will have filesystem metadata - their filename and location
@@ -244,7 +244,7 @@ there are now $new_fs_n files in the Tomb Filesystem"
 echo "Comparing Tomb Filesystem files to HashSets.com Known Files and Removing Known files"
 fs_n=$(cat $fs_index | wc -l)
 hashsets_md5s=$original_dir/hashsets.md5s #md5s because it only has md5s, not an index
-python3 $original_dir/remove_known_files.py $fs_index $hashsets_md5s
+#python3 $original_dir/remove_known_files.py $fs_index $hashsets_md5s
 
 new_fs_n=$(cat $fs_index | wc -l)
 
@@ -253,7 +253,8 @@ there are now $new_fs_n files in the Tomb Filesystem"
 
 # Filter remaining files, determining their filetype and using our blacklist file to remove any matching
 # extensions and/or classes which we want to disregard.
-python3 $original_dir/filter_files
+echo "Classifying files by Filetype and Sorting Tomb Filesystem"
+python3 $original_dir/filter_files.py $fs_dir $fs_index $original_dir/blacklist
 
 # Scalpel - Carving out parts that match private key hex patterns
 #echo "Searching through ALL bytes on image for any matching private key patterns."

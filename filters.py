@@ -36,7 +36,7 @@ ENCRYPTION_TAGS = set({
 	"encrypt",
 	"encryption",
 	"ransom",
-	"randomware",
+	"ransomware",
 })
 
 IMAGE_TAGS = set({
@@ -74,6 +74,7 @@ AUDIO_TAGS = set({
 	"audio",
 	"music",
 	"audible",
+	"wave"
 })
 
 VIDEO_TAGS = set({
@@ -105,6 +106,12 @@ PROGRAM_TAGS = set({
 	"binary",
 	"hexadecimal",
 	"registry",
+	"cache",
+	"windows",
+	"resource",
+	"macromedia",
+	"riff",
+	"cursor",
 })
 
 ARCHIVE_TAGS = set({
