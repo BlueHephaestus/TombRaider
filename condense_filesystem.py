@@ -77,6 +77,7 @@ import re
 import shutil
 from filesystem_utils import *
 from tqdm import tqdm
+import traceback
 
 # Number of characters to limit our filenames to. We keep it at 240 so we still have some room for renaming
 # before reaching 255 characters, when we later sort into subdirectories.
@@ -96,8 +97,15 @@ def safemv(src, dst):
 
     # Move now that we have no replacement of data (despite the name) guaranteed
     # We return dst filename in case we want to use that later. And b/c it might be changed.
-    os.replace(src, dst)
-    return dst
+    try:
+        os.replace(src, dst)
+        return dst
+    except OSError as e:
+        if e.args[0] != 22:
+            raise
+        print(f"OS ERROR 22 ENCOUNTERED MOVING {src} TO {dst}. YOU ARE LIKELY EITHER OUT OF DISK SPACE OR USING"
+              f"A NON-EXT4 FORMATTED FILESYSTEM, CAUSING AN ERROR DUE TO FILE NAMING.")
+        print(traceback.format_exc())
 
 def sanitize(fpath):
     # Given a filepath with any possible characters, sanitize and return the sanitized filepath.

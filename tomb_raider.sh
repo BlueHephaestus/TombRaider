@@ -92,7 +92,7 @@ photorec_dir="$output_dir/photorec"
 
 mkdir -p $output_dir
 if [[ $image_given -eq 0 ]]; then
-	mkdir -p safecopy_dir
+	mkdir -p $safecopy_dir
 fi
 mkdir -p $testdisk_dir
 mkdir -p $photorec_dir
