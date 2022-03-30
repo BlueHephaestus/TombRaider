@@ -13,10 +13,30 @@ fi
 
 
 # Default arguments
-output_dir=$(realpath "./tomb") # Default directory
+output_dir=$(realpath "./tomb")
 image_given=0 # Defaults to getting image from drive
 keep_image=0 # Defaults to deleting the image after we sort
 dryrun=0 # Default, run everything
+
+#echo "Tomb Raider will now ask for any optional values. Feel free to pass --defaults to use defaults and skip this in the future."
+#
+#default_output_dir=$(realpath "./tomb")
+#read -p "Enter your output dir [$default_output_dir]: " output_dir
+#output_dir=${output_dir:-$default_output_dir}
+#
+#while :
+#do
+#  read -p "Is your tomb an image file (disk.dd, device.img, asdf.raw, etc) or a disk (/dev/sda, /dev/sdf2, etc)? [image/disk]: " tomb_type
+#  if [[ $tomb_type != "disk" && $tomb_type != "image" ]]; then
+#    echo "Please choose 'disk' or 'image'"
+#  else
+#    break
+#  fi
+#done
+#
+#read -p "Enter your output dir [$default_output_dir]: " output_dir
+#output_dir=${output_dir:-$default_output_dir}
+
 
 # Parse arguments
 positional_args=()
