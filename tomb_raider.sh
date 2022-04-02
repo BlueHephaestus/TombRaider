@@ -2,6 +2,15 @@
 # REMOVE WHEN DONE WITH DEV
 #set -x
 
+: '
+TODO
+make sure there is option for no known hashes
+option for never remove anything
+cache the optimal md5 buffer size once we compute it once
+save the .npy file once its obtained
+add an option to save all found files for future hashing
+
+'
 # Usage: ./tomb_raider [OPTIONS] DISK
 # or ./tomb_raider [OPTIONS] --image IMAGEFILE
 # Make sure you are in the directory you want your output stored or specify with -d
@@ -109,6 +118,7 @@ original_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd 
 safecopy_dir="$output_dir/safecopy"
 testdisk_dir="$output_dir/testdisk"
 photorec_dir="$output_dir/photorec"
+known_md5s="$original_dir/known.npy"
 
 mkdir -p $output_dir
 if [[ $image_given -eq 0 ]]; then
@@ -165,117 +175,25 @@ done
 
 echo "Recovering / Undeleting files on $image"
 
-# Recover / undelete all filetypes, without filesystem structure. Uses PhotoRec with all usual filetypes enabled.
-# There are about 5 that it doesn't enable by default, and if you really want those types of files I recommend
-# running it separately. Or just make a PR to add that if you think it should be added :)
-
-# This pretty much always produces some results, even in the cases of randomly wiped drives,
-# just because some conditions for files are very lenient, such that they only require 2 byte
-# header signatures, for instance.
-# we run with these options
-#/d directory - output directory
-# partition_none - get the entire disk
-# everything,enable - all default filetypes
-# paranoid - yes (no paranoid misses a lot of files (trading that for speed) , and paranoid bf is only for piecing together images (maybe only jpg) and takes exponentially longer)
-# keep corrupted - yes
-# expert - no
-# lowmem - no
-
 cd $photorec_dir
 if [[ $dryrun -eq 0 ]]; then
 	photorec /debug /log /d $photorec_dir/photorec /cmd $image partition_none,options,keep_corrupted_file,paranoid,fileopt,everything,enable,search
 fi
 
-
 cd $output_dir
-# Condense Filesystem - Remove all subdirectories in photorec/ and testdisk/, instead converting
-# all filenames into sanitized versions which also contain their original filepath in the filename.
-echo "Condensing result Testdisk Filesystem"
-python3 $original_dir/condense_filesystem.py $testdisk_dir
-echo "Condensing result PhotoRec Filesystem"
-python3 $original_dir/condense_filesystem.py $photorec_dir
 
-# Index newly condensed filesystems, mapping filenames to hashes of file contents
-echo "Indexing Testdisk Filesystem"
-python3 $original_dir/index_filesystem.py $testdisk_dir
-echo "Indexing PhotoRec Filesystem"
-python3 $original_dir/index_filesystem.py $photorec_dir
-
-# Remove duplicates from both filesystems, using indexes
-testdisk_index=$output_dir/testdisk.index
-photorec_index=$output_dir/photorec.index
-testdisk_n=$(cat $testdisk_index | wc -l)
-photorec_n=$(cat $photorec_index | wc -l)
-
-echo "Indexed $testdisk_n files in Testdisk Filesystem"
-echo "Indexed $photorec_n files in PhotoRec Filesystem"
-
-echo "Removing Duplicates from Testdisk Filesystem"
-python3 $original_dir/remove_indexed_duplicates.py $testdisk_dir $testdisk_index
-echo "Removing Duplicates from PhotoRec Filesystem"
-python3 $original_dir/remove_indexed_duplicates.py $photorec_dir $photorec_index
-
-fs_partitions=$((`mmls -a $image | wc -l`-5))
-new_testdisk_n=$(cat $testdisk_index | wc -l)
-new_photorec_n=$(cat $photorec_index | wc -l)
-echo "Removed $((testdisk_n-new_testdisk_n)) Duplicate Files from Testdisk Filesystem, \
-there are now $new_testdisk_n files in the Testdisk Filesystem"
-echo "Removed $((photorec_n-new_photorec_n)) Duplicate Files from PhotoRec Filesystem, \
-there are now $new_photorec_n files in the PhotoRec Filesystem"
-testdisk_n=$new_testdisk_n
-photorec_n=$new_photorec_n
-
-# Finally merge the two filesystems, in a special way. Here's how. If Testdisk recovered files/data from the image,
-# then the files/data it recovered will have filesystem metadata - their filename and location
-# of each file. PhotoRec usually does not have any of this data for the files it's recovered, either because
-# of how it recovers them, or simply because when a filesystem "deletes" a file, it deletes its pointers and labels
-# for the file, i.e. its name and location on the filesystem.
-#
-# So because of this, if we find a duplicate pair - a file that is in testdisk once and in photorec once, we
-# discard the one from photorec since testdisk will have greater than or equal to the metadata that photorec has.
-echo "Merging Testdisk and PhotoRec Filesystems and Removing Pair Duplicates"
-
-fs_dir=$output_dir/filesystem/
-fs_index=$output_dir/filesystem.index
-mkdir -p $fs_dir
-
-python3 $original_dir/merge_testdisk_photorec.py $testdisk_dir $testdisk_index $photorec_dir $photorec_index $fs_dir $fs_index
-fs_n=$(cat $fs_index | wc -l)
-echo "Removed $(((testdisk_n+photorec_n)-fs_n)) Pair Duplicate Files"
-echo "Merged $testdisk_n Testdisk files and $photorec_n PhotoRec files into new Tomb Filesystem with $fs_n files."
-
-# Remove any files in the "known good" hashsets from NIST NSRL.
-# We check our indexes for any files in these hashsets, with the knowledge that these are files which were
-# either already on the operating system at initialization, or are otherwise common and usual programs we'd
-# expect to find on a hard drive, and we don't care about (e.g. Photoshop, Microsoft Word, Minesweeper).
-# Of course if they've used those programs and they keep files, we'll still have those, which is a good and bad
-# thing, because it means the boring programs may still have files laying around, but it also means that
-# we'll still know what data was produced or if they *used* bad programs which were also known.
-# Essentially, this removes static non-relevant data
-echo "Comparing Tomb Filesystem files to NSRL Known Files and Removing Known files"
-nsrl_md5s=$original_dir/nsrl.md5s #md5s because it only has md5s, not an index
-python3 $original_dir/remove_known_files.py $fs_index $nsrl_md5s
-
-new_fs_n=$(cat $fs_index | wc -l)
-echo "Removed $((fs_n-new_fs_n)) NSRL Known Files from Tomb Filesystem, \
-there are now $new_fs_n files in the Tomb Filesystem"
-
-# Do it again on any personal MD5 hashsets we have
-echo "Comparing Tomb Filesystem files to HashSets.com Known Files and Removing Known files"
-fs_n=$(cat $fs_index | wc -l)
-hashsets_md5s=$original_dir/hashsets.md5s #md5s because it only has md5s, not an index
-python3 $original_dir/remove_known_files.py $fs_index $hashsets_md5s
-
-new_fs_n=$(cat $fs_index | wc -l)
-
-echo "Removed $((fs_n-new_fs_n)) Hashsets.com Known Files from Tomb Filesystem, \
-there are now $new_fs_n files in the Tomb Filesystem"
-
-# Filter remaining files, determining their filetype and using our blacklist file to remove any matching
-# extensions and/or classes which we want to disregard.
-# By default does not use a blacklist
-echo "Classifying files by Filetype and Sorting Tomb Filesystem"
-python3 $original_dir/filter_files.py $fs_dir $fs_index
+testdisk_n=$(find $testdisk_dir -type f | wc -l)
+photorec_n=$(find $photorec_dir -type f | wc -l)
+echo "Testdisk Filesystem Recovered $testdisk_n Files."
+echo "PhotoRec Filesystem Recovered $photorec_n Files."
+echo "Current Number of Files: $(($testdisk_n + $photorec_n))"
+echo "Testdisk and PhotoRec acquired, now Raiding and creating new Tomb Filesystem from recovered data."
+echo "This will Process, Condense, Remove Duplicates, and Organize all found files into the Tomb Filesystem."
+#echo "Processing, Condensing, Indexing, and removing Duplicates or Known files in Testdisk Filesystem."
+python3 $original_dir/raid_filesystem.py $testdisk_dir $photorec_dir $output_dir $known_md5s
+tomb_n=$(find $output_dir -type f | wc -l)
+condense_perc=$(bc <<<"scale=2;$tomb_n/($testdisk_n+$photorec_n)*100")
+echo "Tomb Filesystem Complete. New File Count: $tomb_n. This has been condensed to $condense_perc% of the original size."
 
 # Scalpel - Carving out parts that match private key hex patterns
 #echo "Searching through ALL bytes on image for any matching private key patterns."

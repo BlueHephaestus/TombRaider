@@ -30,6 +30,9 @@ SMALL_IMG_THRESHOLD = 50000 #50kb
 # Pymagic to determine info from file contents (and magic numbers hence the name)
 get_info = magic.Magic(keep_going=False, uncompress=False, extension=False)
 
+known = lambda c: c != "Unknown" and c != "Unsupported"
+unknown = lambda c: c == "Unknown"
+unsupported = lambda c: c == "Unsupported"
 def filetype_from_ext(fname):
     # Determine which grouping the ext belongs to (can only belong to one)
     ext = os.path.splitext(fname)[-1].lower()
