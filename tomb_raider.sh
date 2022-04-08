@@ -168,7 +168,10 @@ while [[ $i -le $fs_partitions ]]
 do
 	echo "Running Testdisk to attempt to recover files on partition $i/$fs_partitions"
 	if [[ $dryrun -eq 0 ]]; then # run them if not dryrunning
-		testdisk /debug /log /cmd $image advanced,$i,list,filecopy
+	  # Tried to find a way for this to show the number of files copied but it isn't in the documentation
+	  # and doesn't seem to be possible with scripted runs. We don't use /debug since that causes
+	  # the runs to be far slower.
+		testdisk /log /cmd $image advanced,$i,list,filecopy
 	fi
 	((i++))
 done
