@@ -5,6 +5,7 @@ Various multi-use utilities and tools for helping work with and manipulate files
 """
 
 import os
+import re
 from tqdm import tqdm
 
 def fpaths(dir):
@@ -15,10 +16,18 @@ def fpaths(dir):
             l.append(os.path.join(root,f))
     return l
 
-def localize(fpath, root):
+def localize(fpath, root, tombroot=False):
     # Given we are operating inside of the root filepath, return the localised version of fpath.
     # e.g. fpath=/usr/share/bin/script, root = /usr/share/bin/ -> return ./script
     # Has checks to make sure it doesn't leave extra slashes.
+    # Will additionally remove testdisk and photorec if checking the tombroot (full root of operations)
+    if tombroot:
+        if "tomb/photorec" in fpath:
+            fpath = re.sub('photorec\/photorec\.\d+\/', '', fpath, count=1)
+
+        elif "tomb/testdisk" in fpath:
+            fpath = re.sub('testdisk\/', '', fpath, count=1)
+
 
     # If root with trailing slash is in fpath, use that so we don't make a double slash
     if root[-1] != "/" and root+"/" in fpath:

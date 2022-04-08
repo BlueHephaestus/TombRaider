@@ -187,7 +187,8 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
     # 4x slower than set contains, however they're both so damn fast that on 600,000 lookups searchsorted took a TOTAL
     # of 2 seconds compared to set.contains .5 seconds. So we good to go.
     print(f"Loading known hashes file {known_md5s_fname}. This may take a moment...")
-    known_md5s = np.load(known_md5s_fname, allow_pickle=True)
+    #known_md5s = np.load(known_md5s_fname, allow_pickle=True)
+    known_md5s = np.arange(10)
     n = len(known_md5s)
     def isknown(digest):
         # Wish they could just have a contains method but oh heckin well
@@ -232,10 +233,12 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
             os.mkdir(subdir)
 
         # # Store in index
-        condensed_fpath= subdir + "/" + sanitize(localize(fpath, filesystem_root))
+        condensed_fpath= subdir + "/" + sanitize(localize(fpath, filesystem_root, tombroot=True))
         safemv(fpath, condensed_fpath)
         index[digest] = condensed_fpath
 
+    # Write Index
+    write_index(index, filesystem_root + "/" + "filesystem.index")
     # Remove any remaining directories if they are empty
     print("Removing Leftover Testdisk and PhotoRec files")
     remove_leftover_dirs(testdisk_root)
@@ -253,7 +256,7 @@ if __name__ == "__main__":
     addslash = lambda root: root[:-1] if root[-1] == "/" else root
     testdisk_root = addslash(testdisk_root)
     photorec_root = addslash(photorec_root)
-    filesystem_root = addslash(testdisk_root)
+    filesystem_root = addslash(filesystem_root)
     if len(sys.argv) == 6:
         blacklist = sys.argv[5]
         process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, blacklist_fname=blacklist)

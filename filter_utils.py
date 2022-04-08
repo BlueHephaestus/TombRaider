@@ -28,6 +28,7 @@ labels = ["Encrypted",   "Archives",    "Videos",    "Audio",    "Images",    "P
 SMALL_IMG_THRESHOLD = 50000 #50kb
 
 # Pymagic to determine info from file contents (and magic numbers hence the name)
+#get_info = magic.Magic(keep_going=False, uncompress=False, extension=False)
 get_info = magic.Magic(keep_going=False, uncompress=False, extension=False)
 
 known = lambda c: c != "Unknown" and c != "Unsupported"
@@ -47,6 +48,36 @@ def filetype_from_ext(fname):
 
     # Has an extension but it's not in any of our lists, unsupported
     return "Unsupported"
+
+def safe_magic(fname):
+    """
+    Unfortunately the magic library, while it can be really good at providing info on just about all filetypes,
+        it doesn't work on all file types.
+
+    I've found errors like the following when running this:
+        error reading, Invalid Argument
+        error reading, statically linked
+        error reading, dynamically linked
+
+    And possibly others. I guess that's gonna end up happening when you're testing it on literally millions of files.
+
+    None of which are caused by the python library, but by the underlying C library, and they aren't fixed.
+    Anyways, this does that file get in a "safe" manner, where it returns unknown if there are any of these
+        magic errors. Fortunately this will mean we don't have to remove any files, and since this actually
+        occurs on a less-than-one-million rate, this should be alright.
+
+    I wanted to add a "Dark Magic" folder but that wouldn't be helpful since the extension might actually give us info,
+        which we could use to categorize even if this doesn't give us data.
+
+    :param fname: Filename
+    :return: usual magic info, with "data" returned if magic has errors
+    """
+    try:
+        return get_info.from_file(fname)
+
+    except magic.MagicException as e:
+        print(f"Encountered error in LibMagic C library for file {fname}: {repr(e)}. This file will be categorized as Unknown.")
+        return "data"
 
 
 def filetype_from_info(fname):
@@ -73,7 +104,7 @@ def filetype_from_info(fname):
         "Compressed Heavy Documentation" -> Should be archive, not document.
         "Encrypted Archive" -> Should be encrypted, not archive.
     """
-    info = get_info.from_file(fname)
+    info = safe_magic(fname)
     info = info.lower()
     infotags = set(info.split(" "))
 
