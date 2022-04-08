@@ -26,6 +26,7 @@ labels = ["Encrypted",   "Archives",    "Videos",    "Audio",    "Images",    "P
 
 # Byte threshold which we use to determine if an image is "Small"
 SMALL_IMG_THRESHOLD = 50000 #50kb
+DEBUG = False # TODO add this for print statements later, possibly rename to VERBOSE, possibly put in config file
 
 # Pymagic to determine info from file contents (and magic numbers hence the name)
 #get_info = magic.Magic(keep_going=False, uncompress=False, extension=False)
@@ -76,7 +77,8 @@ def safe_magic(fname):
         return get_info.from_file(fname)
 
     except magic.MagicException as e:
-        print(f"Encountered error in LibMagic C library for file {fname}: {repr(e)}. This file will be categorized as Unknown.")
+        if DEBUG:
+            print(f"Encountered error in LibMagic C library for file {fname}: {repr(e)}. This file will be categorized as Unknown.")
         return "data"
 
 
