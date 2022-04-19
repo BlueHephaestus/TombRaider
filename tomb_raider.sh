@@ -131,8 +131,8 @@ mkdir -p $photorec_dir
 # SAFECOPY - Imaging as much of drive as possible
 # From /dev/sdX to disk.img
 # WILL SKIP IF THE IMAGE FILE IS PROVIDED
-cd $safecopy_dir
 if [[ $image_given -eq 0 ]]; then # get an image from the drive, since we don't have one yet
+  cd $safecopy_dir
 	image=$(realpath "$output_dir/disk.img") # Default image loc
 	echo "Imaging drive $drive to new image $image. DO NOT MOUNT YOUR DEVICE."
 

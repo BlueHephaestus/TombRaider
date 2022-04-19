@@ -1,54 +1,16 @@
 import sys
 import os
 import re
-import shutil
 import hashlib
 from filesystem_utils import *
 from tqdm import tqdm
-import traceback
 from filter_utils import *
 import time
 import numpy as np
 from collections import defaultdict
 
-# Number of characters to limit our filenames to. We keep it at 240 so we still have some room for renaming
-# before reaching 255 characters, when we later sort into subdirectories.
-FPATH_TRIM_LENGTH = 240
 MD5_BUFFER_SIZE = 65536  # default unless we run function to get the optimal value for this sytem
 
-def safemv(src, dst):
-    # Move file at location src to location dst, renaming it if needed to avoid any destruction of data.
-    if os.path.exists(dst) and src != dst:
-        # If a copy exists, instead rename to filename.txt.1, filename.txt.2, filename.txt.3,
-        # etc. until we have a unique filename
-        dst_copy = dst + ".{}"
-        i = 1
-        while os.path.exists(dst_copy.format(i)):
-            i += 1
-
-        # Found a value not taken, format
-        dst = dst_copy.format(i)
-
-    # Move now that we have no replacement of data (despite the name) guaranteed
-    # We return dst filename in case we want to use that later. And b/c it might be changed.
-    try:
-        os.replace(src, dst)
-        return dst
-    except OSError as e:
-        if e.args[0] != 22:
-            raise
-        print(f"OS ERROR 22 ENCOUNTERED MOVING {src} TO {dst}. YOU ARE LIKELY EITHER OUT OF DISK SPACE OR USING"
-              f"A NON-EXT4 FORMATTED FILESYSTEM, CAUSING AN ERROR DUE TO FILE NAMING.")
-        print(traceback.format_exc())
-
-def sanitize(fpath):
-    # Given a filepath with any possible characters, sanitize and return the sanitized filepath.
-    # Any possible characters does include unicode (hence regex for simple replaces)
-    fpath = re.sub(r'[-\s]', '_', fpath, flags=re.UNICODE)
-    fpath = re.sub(r'/', '|', fpath, flags=re.UNICODE)
-    fpath = re.sub(r'[^a-zA-Z0-9._|]', '?', fpath, flags=re.UNICODE)
-    fpath = fpath[:FPATH_TRIM_LENGTH]
-    return fpath
 
 def get_optimal_md5_buffer_size():
     # Run md5 hash on an arbitrary 500MB file with different buffer sizes
@@ -149,11 +111,6 @@ def get_filetype_subdir(fname):
 
     return subdir
 
-def remove_leftover_dirs(root):
-    for dir in os.listdir(root):
-        dir = root + "/" + dir
-        if os.path.isdir(dir) and len(fpaths(dir)) == 0:
-            shutil.rmtree(dir)
 
 def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, blacklist_fname=None):
 
@@ -253,7 +210,6 @@ if __name__ == "__main__":
     photorec_root = sys.argv[2]
     filesystem_root = sys.argv[3]
     known_md5s_fname = sys.argv[4]
-    addslash = lambda root: root[:-1] if root[-1] == "/" else root
     testdisk_root = addslash(testdisk_root)
     photorec_root = addslash(photorec_root)
     filesystem_root = addslash(filesystem_root)
