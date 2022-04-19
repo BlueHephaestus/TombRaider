@@ -1,53 +1,13 @@
 import sys
 import os
 import re
-import hashlib
 from filesystem_utils import *
 from tqdm import tqdm
 from filter_utils import *
-import time
+from hash_utils import *
 import numpy as np
 from collections import defaultdict
 
-MD5_BUFFER_SIZE = 65536  # default unless we run function to get the optimal value for this sytem
-
-
-def get_optimal_md5_buffer_size():
-    # Run md5 hash on an arbitrary 500MB file with different buffer sizes
-    # to determine the fastest buffer size for this machine.
-
-    print("Determining System-Wide Optimal MD5 Buffer Size")
-    # 500mb random content file
-    f = open("md5test","wb")
-    f.write(os.urandom(500000000)) #500 million
-    f.close()
-
-    # Time to time from 1024 to 4,194,304
-    sizes = [2**(i) for i in range(10, 22)]
-    times = [0]*len(sizes)
-    for i,size in enumerate(tqdm(sizes)):
-        start = time.time()
-        hash_md5 = hashlib.md5()
-        with open("md5test", "rb") as f:
-            for chunk in iter(lambda: f.read(size), b""):
-                hash_md5.update(chunk)
-        end = time.time()-start
-        times[i] = end
-
-    optimal_buffer_size = sizes[np.argmin(times)]
-    global MD5_BUFFER_SIZE #Update global usevar
-    MD5_BUFFER_SIZE = optimal_buffer_size
-    print(f"Determined {optimal_buffer_size} as Optimal Buffer Size")
-    return optimal_buffer_size
-
-
-def md5(fpath):
-    # Quickly get md5 hash for file contents of fname
-    hash_md5 = hashlib.md5()
-    with open(fpath, "rb") as f:
-        for chunk in iter(lambda: f.read(MD5_BUFFER_SIZE), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
 
 def get_filetype_subdir(fname):
     # Determine it's type, so we can know if its in blacklist and should be deleted.
@@ -144,8 +104,7 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
     # 4x slower than set contains, however they're both so damn fast that on 600,000 lookups searchsorted took a TOTAL
     # of 2 seconds compared to set.contains .5 seconds. So we good to go.
     print(f"Loading known hashes file {known_md5s_fname}. This may take a moment...")
-    #known_md5s = np.load(known_md5s_fname, allow_pickle=True)
-    known_md5s = np.arange(10)
+    known_md5s = np.load(known_md5s_fname, allow_pickle=True)
     n = len(known_md5s)
     def isknown(digest):
         # Wish they could just have a contains method but oh heckin well
