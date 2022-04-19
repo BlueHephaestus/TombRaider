@@ -1,17 +1,10 @@
 """
-Tool to go through all tombs and produce a separate tombs.md5s hashset file from the files,
-    and print stats on how much storage would be saved for this.
+Tool to go through all tombs and print stats on storage space saved by creating hashsets across all tombs.
+    Does this to maximize speed since it otherwise takes forever, and uses only filesize to check files for equality
 """
-import sys
-import os
-import re
 from filesystem_utils import *
-from tqdm import tqdm
-from filter_utils import *
 from hash_utils import *
-from collections import defaultdict
 from reprint import output
-from imohash import hashfile
 
 # All possible subdirectories from tomb raider results.
 # Only counts if it's tomb/{subdir}
@@ -53,12 +46,6 @@ def safesize(fpath):
     except OSError:
         return 0
 
-def fasthash(fpath, size):
-    # get size of file and first 8 bytes, concatenate and return this as hash
-    #with open(fpath,'rb') as f: b = f.read(8)
-    #return size ^ int.from_bytes(b, byteorder="big")
-    return size
-
 def hash(tombs_root):
     """
     Given a bunch of tombs, will hash every file, building a hash set from all of them.
@@ -97,7 +84,8 @@ def hash(tombs_root):
             #digest = fasthash(fpath)
             #digest = md5(fpath)
             size = safesize(fpath)
-            digest = fasthash(fpath, size)
+            #digest = fasthash(fpath, size)
+            digest = size
 
             total_n += 1
             total_size += size
