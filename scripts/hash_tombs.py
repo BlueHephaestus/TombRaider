@@ -1,6 +1,8 @@
 """
 Tool to go through all tombs and print stats on storage space saved by creating hashsets across all tombs.
     Does this to maximize speed since it otherwise takes forever, and uses only filesize to check files for equality
+
+USE ONLY FOR ESTIMATION, NOT FOR A FULL ANALYSIS. Change the digest computation to md5 for that.
 """
 from filesystem_utils import *
 from hash_utils import *
@@ -39,12 +41,6 @@ def rowstr(key, n, s, total_n, total_s, header=False):
     else:
         s = f"{key.ljust(21)} | {nformat(n)} | {sformat(s)} | {pformat(n / total_n)} | {pformat(s / total_s)}"
     return s
-
-def safesize(fpath):
-    try:
-        return os.path.getsize(fpath)
-    except OSError:
-        return 0
 
 def hash(tombs_root):
     """

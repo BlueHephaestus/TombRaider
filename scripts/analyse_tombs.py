@@ -104,7 +104,7 @@ def analyse(tombs_root):
     total_n = sum([v for k,v in nums.items() if k in TOMB_SUBDIRS])
     total_s = sum([v for k,v in sizes.items() if k in TOMB_SUBDIRS])
 
-    with open("filesystem.stats", "w") as f:
+    with open("../filesystem.stats", "w") as f:
         rowprint(f,"CLASSIFICATION", "TOTAL #", "TOTAL SIZE", "% OF #", "% OF SIZE", header=True)
         for subdir in sorted(TOMB_SUBDIRS):
             n,s = nums[subdir], sizes[subdir]

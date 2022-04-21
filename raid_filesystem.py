@@ -1,3 +1,4 @@
+import shutil
 import sys
 import os
 import re
@@ -159,6 +160,19 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
     print("Removing Leftover Testdisk and PhotoRec files")
     remove_leftover_dirs(testdisk_root)
     remove_leftover_dirs(photorec_root)
+
+    # Compress resulting tomb to save storage space
+    # sizestr = lambda size: str(round(size/1000000000., 2)) + " GB"
+    # print("Testing archive methods")
+    # s = time.time()
+    # shutil.make_archive(filesystem_root, "gztar", filesystem_root)
+    # print(f"GZTAR took {(time.time()-s)/60} minutes, filesize = {sizestr(safesize(filesystem_root + '.tar.gz'))}")
+    # s = time.time()
+    # shutil.make_archive(filesystem_root, "bztar", filesystem_root)
+    # print(f"BZTAR took {(time.time()-s)/60} minutes, filesize = {sizestr(safesize(filesystem_root + '.tar.bz2'))}")
+    # s = time.time()
+    # shutil.make_archive(filesystem_root, "xztar", filesystem_root)
+    # print(f"XZTAR took {(time.time()-s)/60} minutes, filesize = {sizestr(safesize(filesystem_root + '.tar.xz'))}")
 
 
 if __name__ == "__main__":
