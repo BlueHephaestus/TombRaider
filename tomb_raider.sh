@@ -205,10 +205,9 @@ echo "Tomb Filesystem Complete. New File Count: $tomb_n. This has been condensed
 # Salvage - Check scalpel'd files for any keys that connect to an address with BTC balance.
 #echo "Trying mutations and various formattings for found keys to check for BTC Balance."
 #echo "Key Variants will appear as they are tried, and the program will exit with information EARLY if a balance is found. Good luck!"
-python3 $original_dir/bitcoin_salvager.py $output_dir
+#python3 bitcoin_salvager.py scalpel-output/
 
-
-# REMOVE IMAGE
+# CLEAN UP
 # If they didn't provide an image, then we have a TR Image. We delete it if they don't specify otherwise.
 if [[ $image_given -eq 0 && $keep_image -eq 0 ]]; then
 	echo "Removing Tomb Raider $image to save disk space."
@@ -217,18 +216,6 @@ elif [[ $image_given -eq 0 && $keep_image -eq 1 ]]; then
 	echo "Keeping Tomb Raider Image $image since requested by user."
 fi
 
-# ARCHIVE
-# Now that tomb is complete, compress it using TAR + LZ4
-# Reasons for this are many:
-# 1. GZIP takes hours for even a relatively small tarfile (40GB) whereas lz4 takes less than 10 minutes
-# 2. Compression ratios are very comparable between them despite this
-# 3*. My theory for this is because it's compressing a bunch of files rather than one big file, so block compression
-# may be more intuitive here. But this is a semi-reason since i'm not sure how it works under the hood.
-#TODO add print statement for how much file size was reduced via compression
-
-echo "Compressing Tomb Filesystem to save disk space."
-cd $output_dir/..
-tar cf - -C $output_dir/ . | pv -s $(du -sb $output_dir/ | awk '{print $1}') | lz4 > $output_dir.tar.lz4
 
 # Return to where this was called
 cd $original_dir

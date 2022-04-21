@@ -20,15 +20,15 @@ addslash = lambda root: root[:-1] if root[-1] == "/" else root
 def fpaths(dir):
     # Return a list of all filepaths in directory - not a generator.
     l = []
-    print("Getting list of all filepaths...")
+    #print("Getting list of all filepaths...")
     n = 0
     for root,_,files in os.walk(dir):
         for f in files:
             l.append(os.path.join(root,f))
             n += 1
-            sys.stdout.write(f"\r{str(f'{n:,}').rjust(13)} files iterated")
-    sys.stdout.flush()
-    print()
+            #sys.stdout.write(f"\r{str(f'{n:,}').rjust(13)} files iterated")
+    #sys.stdout.flush()
+    #print()
     return l
 
 def localize(fpath, root, tombroot=False):
@@ -94,6 +94,12 @@ def safemv(src, dst):
         print(f"OS ERROR 22 ENCOUNTERED MOVING {src} TO {dst}. YOU ARE LIKELY EITHER OUT OF DISK SPACE OR USING"
               f"A NON-EXT4 FORMATTED FILESYSTEM, CAUSING AN ERROR DUE TO FILE NAMING.")
         print(traceback.format_exc())
+
+def safesize(fpath):
+    try:
+        return os.path.getsize(fpath)
+    except OSError:
+        return 0
 
 def sanitize(fpath):
     # Given a filepath with any possible characters, sanitize and return the sanitized filepath.
