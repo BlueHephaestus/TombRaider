@@ -43,8 +43,7 @@ def rowstr(key, n, s, total_n, total_s, header=False):
     return s
 
 def hash(tombs_root):
-    """
-    Given a bunch of tombs, will hash every file, building a hash set from all of them.
+    """ Given a bunch of tombs, will hash every file, building a hash set from all of them.
         Will also keep track of the size of each file as we go, so that at the end we can print
         total size of all files checked
         total size of files hashsed

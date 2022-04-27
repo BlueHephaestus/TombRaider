@@ -18,8 +18,7 @@ from collections import defaultdict
 # All possible subdirectories from tomb raider results.
 # Only counts if it's tomb/{subdir}
 TOMB_SUBDIRS = set([
-    "Encrypted",
-    "Archives",
+    "Encrypted", "Archives",
     "Videos",
     "Audio",
     "Images",

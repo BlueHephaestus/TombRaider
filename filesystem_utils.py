@@ -69,6 +69,7 @@ def remove_leftover_dirs(root):
         dir = root + "/" + dir
         if os.path.isdir(dir) and len(fpaths(dir)) == 0:
             shutil.rmtree(dir)
+    shutil.rmtree(root) # close by removing the dir
 
 def safemv(src, dst):
     # Move file at location src to location dst, renaming it if needed to avoid any destruction of data.

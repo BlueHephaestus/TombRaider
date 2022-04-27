@@ -4,6 +4,7 @@ import re
 import sys
 import os
 import tqdm
+import mmap
 from tqdm import tqdm
 
 def salvage(priv):
@@ -58,8 +59,23 @@ def fpaths(directory):
 	return l
 
 def key_hex_candidates(fpath):
-	with open(fpath, "rb") as f:
-		candidates= re.findall(b'\x01\x01\x04\x20(.{32})', f.read())
+	candidates = []
+	try:
+		with open(fpath, "rb") as f:
+			candidates= re.findall(b'\x01\x01\x04\x20(.{32})', f.read())
+	except MemoryError:
+		print(f"Encountered Very Large File {fpath} ({round(os.path.getsize(fpath)/1000000000, 2)} GB)\n \
+			  Attempting a Memory Mapping to read through it, this may take a moment.")
+		try:
+			with open(fpath, 'r+') as f:
+				data = mmap.mmap(f.fileno(), 0)
+				#mo = re.search('error: (.*)', data)
+				candidates = re.findall(b'\x01\x01\x04\x20(.{32})', data)
+			print("Successfully Read File, Continuing")
+		except:
+			print("Memory Map Read failed, skipping")
+
+
 	return candidates
 
 # FROM ORIGINAL, FOR REFERENCE
@@ -88,32 +104,31 @@ if __name__ == "__main__":
 		dtype = "hex"
 
 	indent = 0
-	keys = []
+	keys = set({})
 
 	if dtype == "dir":
 		print("Directory Detected. Obtaining candidate private keys...")
-		for fpath in fpaths(data):
+		for fpath in tqdm(fpaths(data)):
 			candidates = key_hex_candidates(fpath)
 			for priv in candidates:
-				keys.append(priv.hex())
+				keys.add(priv.hex())
 
 
 	elif dtype == "file":
 		print("File Detected. Obtaining candidate private keys...")
 		candidates = key_hex_candidates(data)
 		for priv in candidates:
-			keys.append(priv.hex())
+			keys.add(priv.hex())
 
 	elif dtype == "hex":
 		print("Hex String Detected. Obtaining candidate private keys...")
-		keys.append(data)
+		keys.add(data)
 
 	print(f"Preprocessing complete, {len(keys)} Candidates Obtained. Testing...")
 	for key in tqdm(keys):
 		tqdm.write(key)
 		salvage(key)
 
-		
 
 
 

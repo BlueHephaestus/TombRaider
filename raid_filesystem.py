@@ -124,6 +124,8 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
     # Iterate through testdisk first, since we only keep a photorec file if it's got new content
     # because testdisk will have the file metadata such as location and name.
     print(f"Raiding Testdisk and Photorec Recovered Filesystems and Creating Tomb Filesystem")
+    # TODO rewrite this to be parallelized (will require running testdisk before photorec as a separate section)
+    # since this should be relatively easy to parallelize and should push the bottleneck back to the disk.
     for fpath in tqdm(fpaths(testdisk_root) + fpaths(photorec_root)):
         # HASH CHECKS
         # First check if we can delete it
@@ -147,7 +149,6 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
         subdir = filesystem_root + "/" + subdir
         if not os.path.isdir(subdir):
             os.mkdir(subdir)
-
         # # Store in index
         condensed_fpath= subdir + "/" + sanitize(localize(fpath, filesystem_root, tombroot=True))
         safemv(fpath, condensed_fpath)

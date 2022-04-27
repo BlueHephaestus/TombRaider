@@ -1,7 +1,6 @@
 #!/bin/bash
 # REMOVE WHEN DONE WITH DEV
 #set -x
-
 : '
 TODO
 make sure there is option for no known hashes
@@ -10,6 +9,8 @@ cache the optimal md5 buffer size once we compute it once
 save the .npy file once its obtained
 add an option to save all found files for future hashing
 
+Add option or defualt behavior to create a simulation of the original filesystem using symbolic links
+to the actual files, so that the only thing thats created is directories and links
 '
 # Usage: ./tomb_raider [OPTIONS] DISK
 # or ./tomb_raider [OPTIONS] --image IMAGEFILE
@@ -133,7 +134,7 @@ mkdir -p $photorec_dir
 # WILL SKIP IF THE IMAGE FILE IS PROVIDED
 if [[ $image_given -eq 0 ]]; then # get an image from the drive, since we don't have one yet
   cd $safecopy_dir
-	image=$(realpath "$output_dir/disk.img") # Default image loc
+	image=$(realpath "$output_dir/../disk.img") # Default image loc
 	echo "Imaging drive $drive to new image $image. DO NOT MOUNT YOUR DEVICE."
 
 	if [[ $dryrun -eq 0 ]]; then # run them if not dryrunning
@@ -180,7 +181,7 @@ echo "Recovering / Undeleting files on $image"
 
 cd $photorec_dir
 if [[ $dryrun -eq 0 ]]; then
-	photorec /debug /log /d $photorec_dir/photorec /cmd $image partition_none,options,keep_corrupted_file,paranoid,fileopt,everything,enable,search
+  photorec /debug /log /d $photorec_dir/photorec /cmd $image partition_none,options,keep_corrupted_file,paranoid,fileopt,everything,enable,search
 fi
 
 cd $output_dir
@@ -202,10 +203,10 @@ echo "Tomb Filesystem Complete. New File Count: $tomb_n. This has been condensed
 #echo "Searching through ALL bytes on image for any matching private key patterns."
 #scalpel disk.img
 
-# Salvage - Check scalpel'd files for any keys that connect to an address with BTC balance.
-#echo "Trying mutations and various formattings for found keys to check for BTC Balance."
-#echo "Key Variants will appear as they are tried, and the program will exit with information EARLY if a balance is found. Good luck!"
-#python3 bitcoin_salvager.py scalpel-output/
+# Salvage - Check Tomb Filesystem for any keys that connect to an address with BTC balance.
+echo "Trying mutations and various formattings for found keys to check for BTC Balance."
+echo "Key Variants will appear as they are tried, and the program will exit with information EARLY if a balance is found. Good luck!"
+python3 $original_dir/bitcoin_salvager.py $output_dir
 
 # CLEAN UP
 # If they didn't provide an image, then we have a TR Image. We delete it if they don't specify otherwise.
@@ -216,6 +217,20 @@ elif [[ $image_given -eq 0 && $keep_image -eq 1 ]]; then
 	echo "Keeping Tomb Raider Image $image since requested by user."
 fi
 
+# COMPRESS / ARCHIVE TOMB
+# Now that tomb is complete, compress it using TAR + LZ4
+# Reasons for this are many:
+# 0. Tarfile because it's the way you make a file out of a directory
+# 1. GZIP takes hours for even a relatively small tarfile (40GB) whereas lz4 takes less than 10 minutes
+# (it takes days for any normal size hard drive)
+# 2. Compression ratios are very comparable between them despite this
+# 3*. My theory for this is because it's compressing a bunch of files rather than one big file, so block compression
+# may be more intuitive here. But this is a semi-reason since i'm not sure how it works under the hood.
+#TODO add print statement for how much file size was reduced via compression
+
+echo "Compressing Tomb Filesystem to save disk space."
+output_archive=${output_dir%/}.tar.lz4
+tar cf - -C $output_dir/ . | pv -s $(du -sb $output_dir/ | awk '{print $1}') | lz4 > $output_archive
 
 # Return to where this was called
 cd $original_dir
