@@ -203,10 +203,11 @@ echo "Tomb Filesystem Complete. New File Count: $tomb_n. This has been condensed
 #echo "Searching through ALL bytes on image for any matching private key patterns."
 #scalpel disk.img
 
-# Salvage - Check Tomb Filesystem for any keys that connect to an address with BTC balance.
-echo "Trying mutations and various formattings for found keys to check for BTC Balance."
-echo "Key Variants will appear as they are tried, and the program will exit with information EARLY if a balance is found. Good luck!"
-python3 $original_dir/bitcoin_salvager.py $output_dir
+# Salvage - Check Tomb Filesystem for any CryptoCurrency or keys connected to a BTC account
+echo "Searching drive for cryptocurrency and any possible BTC keys."
+echo "Any filepaths matching rulesets will appear as matches."
+echo "All Candidate Key Variants will appear as they are tried, and the program will exit with information EARLY if a balance is found on any. Good luck!"
+python3 $original_dir/crypto_salvager.py $output_dir
 
 # CLEAN UP
 # If they didn't provide an image, then we have a TR Image. We delete it if they don't specify otherwise.
