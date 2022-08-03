@@ -7,6 +7,7 @@ import tqdm
 import mmap
 from tqdm import tqdm
 from filesystem_utils import sanitize
+import traceback
 
 # Format is ["Label", True/False (if regex), "Rule"]
 # NOTE: ALMOST ALL OF THESE ARE FROM AUTOPSY
@@ -170,7 +171,9 @@ def key_hex_candidates(fpath):
 		except:
 			print("Memory Map Read failed, skipping")
 
-
+	except OSError:
+		#print(f"Unknown error encountered with File {fpath}: {traceback.format_exc()}, skipping")
+		pass
 	return candidates
 
 
@@ -180,6 +183,7 @@ if __name__ == "__main__":
 	data = sys.argv[1]
 
 	keys = set({})
+
 
 	print("Iterating through directory to check filenames against rulesets and obtain candidate private keys...")
 	for fpath in tqdm(fpaths(data)):
