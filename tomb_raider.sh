@@ -25,8 +25,13 @@ fi
 # Default arguments
 output_dir=$(realpath "./tomb")
 image_given=0 # Defaults to getting image from drive
-keep_image=0 # Defaults to deleting the image after we sort
-dryrun=0 # Default, run everything
+delete_image=0 #defaults to not deleting image afterwards
+skip_safecopy=0
+skip_testdisk=0
+skip_photorec=0
+skip_raid=0
+skip_crypto=0
+skip_archive=0
 
 #echo "Tomb Raider will now ask for any optional values. Feel free to pass --defaults to use defaults and skip this in the future."
 #
@@ -63,15 +68,39 @@ while [[ $# -gt 0 ]]; do
 			shift # past argument
 			shift # past value
 			;;
-		-k|--keep-image)
-			# If they want to keep the disk.img file in the case they didn't provide their own (default).
-			# Usually tombraider deletes this to save space once the files have been condensed
-			keep_image=1
+		-nf|--no-image-file)
+      # To delete the image file after running. Usually to save disk space.
+			delete_image=1
 			shift # past argument
 			;;
-		-n|--dryrun)
-			# If we want to avoid calls and just print what would happen.
-			dryrun=1
+		-ns|--no-safecopy)
+			# To skip safecopy. Should have a suitable image instead of the safecopy one.
+			skip_safecopy=1
+			shift # past argument
+			;;
+		-nt|--no-testdisk)
+			# To skip testdisk
+			skip_testdisk=1
+			shift # past argument
+			;;
+		-np|--no-photorec)
+			# To skip photorec
+			skip_photorec=1
+			shift # past argument
+			;;
+		-nr|--no-raid)
+			# To skip raiding
+			skip_raid=1
+			shift # past argument
+			;;
+		-nc|--no-crypto)
+			# To skip crypto salvaging
+			skip_crypto=1
+			shift # past argument
+			;;
+		-na|--no-archive)
+			# To skip archiving / compressing
+			skip_archive=1
 			shift # past argument
 			;;
 		-*|--*)
@@ -84,14 +113,21 @@ while [[ $# -gt 0 ]]; do
 			;;
   esac
 done
+#TODO -nx TO NOT DO ANYTHING AND JUST VIBE
 
 set -- "${positional_args[@]}" # restore positional parameters
 
 # Print chosen parameters
 echo "OUTPUT DIRECTORY     = ${output_dir}"
-echo "DRY RUN              = ${dryrun}"
-echo "KEEP TOMB IMAGE FILE = ${keep_image}"
+echo "SKIP SAFECOPY        = ${skip_safecopy}"
+echo "SKIP TESTDISK        = ${skip_testdisk}"
+echo "SKIP PHOTOREC        = ${skip_photorec}"
+echo "SKIP RAIDING         = ${skip_raid}"
+echo "SKIP CRYPTO SALVAGE  = ${skip_crypto}"
+echo "SKIP ARCHIVING       = ${skip_archive}"
+echo "DELETE IMAGE FILE    = ${delete_image}"
 echo "IMAGE FILE PROVIDED  = ${image_given}"
+
 if [[ $image_given -eq 1 ]]; then #image file exists
 	echo "IMAGE FILE           = ${image}"
 else
@@ -99,13 +135,6 @@ else
 		drive=$1
 		echo "DRIVE                = ${drive}"
 	fi
-fi
-
-# Neither image nor drive given, break
-if [[ $image_given -eq 0 && -z $drive ]]; then
-	# TRIGGER USAGE CALL
-	echo "You must pass a drive for tomb raider via './tomb_raider /dev/sdX' or an image via './tomb_raider --image disk.img'"
-	exit 1
 fi
 
 #echo "Number files in SEARCH PATH with EXTENSION:" $(ls -1 "${SEARCHPATH}"/*."${EXTENSION}" | wc -l)
@@ -121,27 +150,23 @@ testdisk_dir="$output_dir/testdisk"
 photorec_dir="$output_dir/photorec"
 known_md5s="$original_dir/known.npy"
 
+# Always make these
 mkdir -p $output_dir
-if [[ $image_given -eq 0 ]]; then
-	mkdir -p $safecopy_dir
-fi
+mkdir -p $safecopy_dir
 mkdir -p $testdisk_dir
 mkdir -p $photorec_dir
 
 
 # SAFECOPY - Imaging as much of drive as possible
 # From /dev/sdX to disk.img
-# WILL SKIP IF THE IMAGE FILE IS PROVIDED
-if [[ $image_given -eq 0 ]]; then # get an image from the drive, since we don't have one yet
+# Will skip if -ns / --no-safecopy is specified, will also skip if an image is provided.
+if [[ $skip_safecopy -eq 0 && $image_given -eq 0 ]]; then # get an image from the drive, since we don't have one yet
   cd $safecopy_dir
 	image=$(realpath "$output_dir/../disk.img") # Default image loc
-	echo "Imaging drive $drive to new image $image. DO NOT MOUNT YOUR DEVICE."
-
-	if [[ $dryrun -eq 0 ]]; then # run them if not dryrunning
-		safecopy --stage1 $drive $image
-		safecopy --stage2 $drive $image
-		safecopy --stage3 $drive $image
-	fi
+  echo "Imaging drive $drive to new image $image. DO NOT MOUNT OR UNPLUG YOUR DEVICE."
+  safecopy --stage1 $drive $image
+  safecopy --stage2 $drive $image
+  safecopy --stage3 $drive $image
 
 	echo "Imaging Complete. You may now unplug your device."
 
@@ -149,73 +174,89 @@ else # already have image
 	echo "Existing image provided, using $image."
 fi
 
-echo "Attempting to obtain Filesystem"
-# Filesystem directory
-cd $testdisk_dir
-
-# Get the filesystem on the drive to retain any file metadata and organization, if possible
-# MMLS - Get the number of allocated partitions on disk.img, if any (has to be alloc to have filesystem)
-# This is what we use to determine an upper bound for how many partitions will have recoverable fs's on testdisk.
-# tested via running it on 5 (if not more) of my own salvaged hard disks. This will include any boot files, etc.
-# More info in README
-fs_partitions=$((`mmls -a $image | wc -l`-5))
-if [[ $fs_partitions -lt 0 ]]; then
-	fs_partitions=0
+# if:
+#   we aren't dryrunning, and we want to do other steps AND
+#   we aren't safecopying, we want to skip that AND
+#   we don't have an image to raid AND
+#   we are doing either testdisk or photorec,
+#
+#   we need some image for those steps to work. Otherwise we are just checking for tomb existence later when raiding.
+#
+#   this guarantees we have a disk image for testdisk and photorec, or we're not going to need it.
+if [[ $skip_safecopy -eq 1 && ! -f "$image" && ( $skip_testdisk -eq 0 || $skip_photorec -eq 0 ) ]]; then
+  echo "Unable to find image. Did you specify an image via --image or place one with the default name (disk.img) where this is running?"
+  echo "This can also occur if you tried to skip safecopy without skipping testdisk and photorec, both of which require a disk image to work."
+  exit
 fi
-echo "Found $fs_partitions Possible Filesystem Partitions on $image."
 
-i=1
-while [[ $i -le $fs_partitions ]]
-do
-	echo "Running Testdisk to attempt to recover files on partition $i/$fs_partitions"
-	if [[ $dryrun -eq 0 ]]; then # run them if not dryrunning
-	  # Tried to find a way for this to show the number of files copied but it isn't in the documentation
-	  # and doesn't seem to be possible with scripted runs. We don't use /debug since that causes
-	  # the runs to be far slower.
-		testdisk /log /cmd $image advanced,$i,list,filecopy
-	fi
-	((i++))
-done
 
-echo "Recovering / Undeleting files on $image"
+if [[ $skip_testdisk -eq 0 ]]; then # don't skip
+  echo "Attempting to obtain Filesystem with Testdisk"
+  # Filesystem directory
+  cd $testdisk_dir
 
-cd $photorec_dir
-if [[ $dryrun -eq 0 ]]; then
+  # Get the filesystem on the drive to retain any file metadata and organization, if possible
+  # MMLS - Get the number of allocated partitions on disk.img, if any (has to be alloc to have filesystem)
+  # This is what we use to determine an upper bound for how many partitions will have recoverable fs's on testdisk.
+  # tested via running it on 5 (if not more) of my own salvaged hard disks. This will include any boot files, etc.
+  # More info in README
+  fs_partitions=$((`mmls -a $image | wc -l`-5))
+  if [[ $fs_partitions -lt 0 ]]; then
+    fs_partitions=0
+  fi
+  echo "Found $fs_partitions Possible Filesystem Partitions on $image."
+
+  i=1
+  while [[ $i -le $fs_partitions ]]
+  do
+    echo "Running Testdisk to attempt to recover files on partition $i/$fs_partitions"
+    # Tried to find a way for this to show the number of files copied but it isn't in the documentation
+    # and doesn't seem to be possible with scripted runs. We don't use /debug since that causes
+    # the runs to be far slower.
+    testdisk /log /cmd $image advanced,$i,list,filecopy
+    ((i++))
+  done
+fi
+
+if [[ $skip_photorec -eq 0 ]]; then # don't skip
+  echo "Recovering / Undeleting files on $image"
+
+  cd $photorec_dir
   photorec /debug /log /d $photorec_dir/photorec /cmd $image partition_none,options,keep_corrupted_file,paranoid,fileopt,everything,enable,search
 fi
 
 cd $output_dir
 
-testdisk_n=$(find $testdisk_dir -type f | wc -l)
-photorec_n=$(find $photorec_dir -type f | wc -l)
-echo "Testdisk Filesystem Recovered $testdisk_n Files."
-echo "PhotoRec Filesystem Recovered $photorec_n Files."
-echo "Current Number of Files: $(($testdisk_n + $photorec_n))"
-echo "Testdisk and PhotoRec acquired, now Raiding and creating new Tomb Filesystem from recovered data."
-echo "This will Process, Condense, Remove Duplicates, and Organize all found files into the Tomb Filesystem."
-#echo "Processing, Condensing, Indexing, and removing Duplicates or Known files in Testdisk Filesystem."
-python3 $original_dir/raid_filesystem.py $testdisk_dir $photorec_dir $output_dir $known_md5s
-tomb_n=$(find $output_dir -type f | wc -l)
-condense_perc=$(bc <<<"scale=2;$tomb_n/($testdisk_n+$photorec_n)*100")
-echo "Tomb Filesystem Complete. New File Count: $tomb_n. This has been condensed to $condense_perc% of the original size."
+# Raid
+if [[ $skip_raid -eq 0 ]]; then #don't skip
+  testdisk_n=$(find $testdisk_dir -type f | wc -l)
+  photorec_n=$(find $photorec_dir -type f | wc -l)
+  echo "Testdisk Filesystem Recovered $testdisk_n Files."
+  echo "PhotoRec Filesystem Recovered $photorec_n Files."
+  echo "Current Number of Files: $(($testdisk_n + $photorec_n))"
+  echo "Testdisk and PhotoRec acquired, now Raiding and creating new Tomb Filesystem from recovered data."
+  echo "This will Process, Condense, Remove Duplicates, and Organize all found files into the Tomb Filesystem."
+  #echo "Processing, Condensing, Indexing, and removing Duplicates or Known files in Testdisk Filesystem."
+  python3 $original_dir/raid_filesystem.py $testdisk_dir $photorec_dir $output_dir $known_md5s
+  tomb_n=$(find $output_dir -type f | wc -l)
+  condense_perc=$(bc <<<"scale=2;$tomb_n/($testdisk_n+$photorec_n)*100")
+  echo "Tomb Filesystem Complete. New File Count: $tomb_n. This has been condensed to $condense_perc% of the original size."
+fi
 
-# Scalpel - Carving out parts that match private key hex patterns
-#echo "Searching through ALL bytes on image for any matching private key patterns."
-#scalpel disk.img
-
-# Salvage - Check Tomb Filesystem for any CryptoCurrency or keys connected to a BTC account
-echo "Searching drive for cryptocurrency and any possible BTC keys."
-echo "Any filepaths matching rulesets will appear as matches."
-echo "All Candidate Key Variants will appear as they are tried, and the program will exit with information EARLY if a balance is found on any. Good luck!"
-python3 $original_dir/crypto_salvager.py $output_dir
+# Salvage - Check Tomb Filesystem for any indications of cryptocurrency / bitcoin
+if [[ $skip_crypto -eq 0 ]]; then #don't skip
+  echo "Checking drive for any evidence of cryptocurrency or bitcoin."
+  echo "Any filepaths matching rulesets will appear as matches."
+  python3 $original_dir/crypto_salvager.py $output_dir
+fi
 
 # CLEAN UP
-# If they didn't provide an image, then we have a TR Image. We delete it if they don't specify otherwise.
-if [[ $image_given -eq 0 && $keep_image -eq 0 ]]; then
-	echo "Removing Tomb Raider $image to save disk space."
+# Delete the image if they specify, keep it otherwise.
+if [[ $delete_image -eq 1 ]]; then
+	echo "Removing Disk Image $image..."
 	rm $image
-elif [[ $image_given -eq 0 && $keep_image -eq 1 ]]; then
-	echo "Keeping Tomb Raider Image $image since requested by user."
+else
+	echo "Keeping Tomb Raider Image $image since not instructed to delete. Use -nf / --no-image-file to delete."
 fi
 
 # COMPRESS / ARCHIVE TOMB
@@ -228,10 +269,15 @@ fi
 # 3*. My theory for this is because it's compressing a bunch of files rather than one big file, so block compression
 # may be more intuitive here. But this is a semi-reason since i'm not sure how it works under the hood.
 #TODO add print statement for how much file size was reduced via compression
+# TODO REMOVE TOMB WHEN DONE WITH ARCHIVING AS AN OPTION?
 
-echo "Compressing Tomb Filesystem to save disk space."
-output_archive=${output_dir%/}.tar.lz4
-tar cf - -C $output_dir/ . | pv -s $(du -sb $output_dir/ | awk '{print $1}') | lz4 > $output_archive
+if [[ $skip_archive -eq 0 ]]; then #don't skip
+  # Copy the index out of this so we don't need to decompress to view contents
+  cp "$output_dir/filesystem.index" $output_dir
+  echo "Archiving/Compressing Tomb Filesystem to save disk space."
+  output_archive=${output_dir%/}.tar.lz4
+  tar cf - -C $output_dir/ . | pv -s $(du -sb $output_dir/ | awk '{print $1}') | lz4 > $output_archive
+fi
 
 # Return to where this was called
 cd $original_dir
