@@ -24,7 +24,6 @@ fi
 
 # Default arguments
 output_dir=$(realpath "./tomb")
-image_given=0 # Defaults to getting image from drive
 delete_image=0 #defaults to not deleting image afterwards
 skip_safecopy=0
 skip_testdisk=0
@@ -59,12 +58,6 @@ while [[ $# -gt 0 ]]; do
 	case $1 in
 		-d|--output-dir)
 			output_dir=$(realpath $2)
-			shift # past argument
-			shift # past value
-			;;
-		-i|--image)
-			image_given=1
-			image=$(realpath $2)
 			shift # past argument
 			shift # past value
 			;;
@@ -126,14 +119,25 @@ echo "SKIP RAIDING         = ${skip_raid}"
 echo "SKIP CRYPTO SALVAGE  = ${skip_crypto}"
 echo "SKIP ARCHIVING       = ${skip_archive}"
 echo "DELETE IMAGE FILE    = ${delete_image}"
-echo "IMAGE FILE PROVIDED  = ${image_given}"
 
-if [[ $image_given -eq 1 ]]; then #image file exists
+# Safecopy / Imaging has strange needed behavior.
+# If they want to skip safecopy, we will run assuming that the given arg is the disk to work on
+# IF they don't want to skip, we will make the image from whatever they give instead,
+# and if it's already a disk image, we will skip making an image entirely.
+
+image_given=0
+if [[ -f $1 ]]; then #given arg is a file, assume it's an image file
+  image=$1
+  image_given=1
 	echo "IMAGE FILE           = ${image}"
 else
-	if [[ -n $1 ]]; then # drive specified instead
+	if [[ -n $1 ]]; then # still is an arg, assume it's a drive specified instead
 		drive=$1
 		echo "DRIVE                = ${drive}"
+	else
+    # no args given, break
+    echo "You must call Tomb Raider with a disk or image file, none found."
+    exit
 	fi
 fi
 
@@ -158,8 +162,8 @@ mkdir -p $photorec_dir
 
 
 # SAFECOPY - Imaging as much of drive as possible
-# From /dev/sdX to disk.img
-# Will skip if -ns / --no-safecopy is specified, will also skip if an image is provided.
+# From /dev/sdX to disk.img, drive to image
+# Will skip if -ns / --no-safecopy is specified, OR if an image file is provided.
 if [[ $skip_safecopy -eq 0 && $image_given -eq 0 ]]; then # get an image from the drive, since we don't have one yet
   cd $safecopy_dir
 	image=$(realpath "$output_dir/../disk.img") # Default image loc
@@ -171,24 +175,14 @@ if [[ $skip_safecopy -eq 0 && $image_given -eq 0 ]]; then # get an image from th
 	echo "Imaging Complete. You may now unplug your device."
 
 else # already have image
-	echo "Existing image provided, using $image."
+  image=$drive
+  if [[ $skip_safecopy -eq 1 ]]; then
+    echo "Skipping safecopy imaging, using $image for disk interface."
+  else
+    echo "Disk Image provided, skipping safecopy imaging step. And using $image for disk interface."
+  fi
 fi
-
-# if:
-#   we aren't dryrunning, and we want to do other steps AND
-#   we aren't safecopying, we want to skip that AND
-#   we don't have an image to raid AND
-#   we are doing either testdisk or photorec,
-#
-#   we need some image for those steps to work. Otherwise we are just checking for tomb existence later when raiding.
-#
-#   this guarantees we have a disk image for testdisk and photorec, or we're not going to need it.
-if [[ $skip_safecopy -eq 1 && ! -f "$image" && ( $skip_testdisk -eq 0 || $skip_photorec -eq 0 ) ]]; then
-  echo "Unable to find image. Did you specify an image via --image or place one with the default name (disk.img) where this is running?"
-  echo "This can also occur if you tried to skip safecopy without skipping testdisk and photorec, both of which require a disk image to work."
-  exit
-fi
-
+# At this this point $image is the only interface to our source device.
 
 if [[ $skip_testdisk -eq 0 ]]; then # don't skip
   echo "Attempting to obtain Filesystem with Testdisk"
