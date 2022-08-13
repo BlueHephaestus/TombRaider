@@ -2,7 +2,7 @@
 
 Automated Imaging, Undeletion, Recovery, Indexing, Organizing, Some Forensics, and Crypto Salvaging for any storage device Linux can recognize.
 
-For those who are here from the BSides talk - thank you for coming! I am still updating the build_deps.sh script and the rest of this README, but overall it's still pretty easy to get running as per the instructions below. Thank you!!!
+For those who are here from the BSides talk - thank you for coming! I am still updating the build_deps.sh script and the rest of this README, but overall it's still pretty easy to get running as per the instructions below. **If you are having issues or wanting to get into it, and you're having issues, I am working on portability but am currently quite swamped with Defcon for the next week. Feel free to reach out and hopefully I will be able to have drastic improvements to that once I'm back, i.e. a week from now / August 20th. However feel free to email bluehephaestus@gmail.com as well.** Thank you!!!
 
 Given any hard drive, Tomb Raider will do everything in its power to recover as much data as possible on the drive, and do so entirely automatically. It was designed because I started wanting to do data recovery on any trashed hard drive I could find, and found myself repeating the same steps over and over for them, or skipping steps because I didn't want to spend the time constantly coming back to it and having to do yet another tedious step for one hard drive after another. I was finding hard drives faster than I could image them, and found myself spending all day doing this and obsessing over it - which wasn't nearly as fun as exploring them and seeing what cool stuff was on them.
 
