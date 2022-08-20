@@ -267,7 +267,7 @@ fi
 
 if [[ $skip_archive -eq 0 ]]; then #don't skip
   # Copy the index out of this so we don't need to decompress to view contents
-  cp "$output_dir/filesystem.index" $output_dir
+  cp "$output_dir/filesystem.index" $output_dir/..
   echo "Archiving/Compressing Tomb Filesystem to save disk space."
   output_archive=${output_dir%/}.tar.lz4
   tar cf - -C $output_dir/ . | pv -s $(du -sb $output_dir/ | awk '{print $1}') | lz4 > $output_archive
