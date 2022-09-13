@@ -127,8 +127,8 @@ echo "DELETE IMAGE FILE    = ${delete_image}"
 
 image_given=0
 if [[ -f $1 ]]; then #given arg is a file, assume it's an image file
-  image=$1
-  image_given=1
+    image=$(realpath "$1")
+    image_given=1
 	echo "IMAGE FILE           = ${image}"
 else
 	if [[ -n $1 ]]; then # still is an arg, assume it's a drive specified instead
@@ -163,26 +163,38 @@ mkdir -p $photorec_dir
 
 # SAFECOPY - Imaging as much of drive as possible
 # From /dev/sdX to disk.img, drive to image
-# Will skip if -ns / --no-safecopy is specified, OR if an image file is provided.
-if [[ $skip_safecopy -eq 0 && $image_given -eq 0 ]]; then # get an image from the drive, since we don't have one yet
-  cd $safecopy_dir
+# Behavior is very dependent on if an image file or drive is provided,
+# and on if -ns / --no-safecopy is specified.
+if [[ $skip_safecopy -eq 0 && $image_given -eq 0 ]]; then 
+    # do not skip, and a device was given. 
+    # get an image from the drive, since we don't have one yet
+    cd $safecopy_dir
 	image=$(realpath "$output_dir/../disk.img") # Default image loc
-  echo "Imaging drive $drive to new image $image. DO NOT MOUNT OR UNPLUG YOUR DEVICE."
-  safecopy --stage1 $drive $image
-  safecopy --stage2 $drive $image
-  safecopy --stage3 $drive $image
+    echo "Imaging drive $drive to new image $image. DO NOT MOUNT OR UNPLUG YOUR DEVICE."
+    safecopy --stage1 $drive $image
+    safecopy --stage2 $drive $image
+    safecopy --stage3 $drive $image
 
-	echo "Imaging Complete. You may now unplug your device."
+    echo "Imaging Complete. You may now unplug your device."
 
-else # already have image
-  image=$drive
-  if [[ $skip_safecopy -eq 1 ]]; then
+elif [[ $skip_safecopy -eq 1 && $image_given -eq 1 ]]; then
+    # skip, and an image was given. Use the image.
     echo "Skipping safecopy imaging, using $image for disk interface."
-  else
+
+elif [[ $skip_safecopy -eq 1 && $image_given -eq 0 ]]; then
+    # skip, and a device was given. Use the device and don't make an image.
+    image=$drive
     echo "Disk Image provided, skipping safecopy imaging step. And using $image for disk interface."
-  fi
+elif [[ $skip_safecopy -eq 0 && $image_given -eq 1 ]]; then
+    # do not skip, and an image was given. Print an error and request user run again
+    # so we don't overwrite an image or repeat work.
+    echo "Existing disk image $image provided, but the --no-safecopy flag was not specified."
+    echo "As it is ambiguous as to if you intend to overwrite the existing image, or if you wish to skip safecopy imaging,"
+    echo "The program will now exit. Please specify one or the other for usage. If you wish to skip safecopy,"
+    echo "You must specify manually via the --no-safecopy flag."
+    exit 1
 fi
-# At this this point $image is the only interface to our source device.
+# At this this point $image is guaranteed to be the device to draw from.
 
 if [[ $skip_testdisk -eq 0 ]]; then # don't skip
   echo "Attempting to obtain Filesystem with Testdisk"
