@@ -1,6 +1,8 @@
 import re
 import sys
 from tqdm import tqdm
+
+import filesystem_utils
 from filesystem_utils import sanitize
 
 # Format is ["Label", True/False (if regex), "Rule"]
@@ -77,55 +79,86 @@ ruleset = [
 ]
 # Compile any regexes before using
 for i,rule in enumerate(ruleset):
-	if rule[1]:
-		ruleset[i][2] = re.compile(rule[2])
+    if rule[1]:
+        ruleset[i][2] = re.compile(rule[2])
 
 def apply_ruleset(fpath):
-	# Given a fpath, check it against all of our rules, and print any matches.
-	matches = []
-	for rule in ruleset:
-		label,is_regex,pattern = rule
-		if is_regex:
-			# Rule is Regex, apply and check
-			# No need to modify pattern since we already did that in the ruleset, plus if we did then we'd have
-			# to recompile. This just runs variants on the fpath instead. This will run all combinations as a result.
-			if bool(re.search(pattern, fpath)) or bool(re.search(pattern, fpath.lower())) or bool(re.search(pattern, sanitize(fpath))):
-				# pattern match, save this
-				matches.append((label, pattern))
+    # Given a fpath, check it against all of our rules, and print any matches.
+    matches = []
+    for rule in ruleset:
+        label,is_regex,pattern = rule
+        if is_regex:
+            # Rule is Regex, apply and check
+            # No need to modify pattern since we already did that in the ruleset, plus if we did then we'd have
+            # to recompile. This just runs variants on the fpath instead. This will run all combinations as a result.
+            if bool(re.search(pattern, fpath)) or bool(re.search(pattern, fpath.lower())) or bool(re.search(pattern, sanitize(fpath))):
+                # pattern match, save this
+                matches.append((label, pattern))
 
-		else:
-			# Rule is simple substring check, check lowercase and sanitized versions as well
-			if pattern in fpath or pattern.lower() in fpath or sanitize(pattern) in fpath:
-				matches.append((label, pattern))
 
-	# Print any matches
-	for label, pattern in matches:
-		print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}'")
+        else:
+            # Rule is simple substring check, check lowercase and sanitized versions as well
+            if pattern in fpath or pattern.lower() in fpath or sanitize(pattern) in fpath:
+                matches.append((label, pattern))
+
+    # Print any matches
+    for label, pattern in matches:
+        print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}'")
+
+def apply_ruleset_in_file(fpath):
+    matches = []
+    with open(fpath,'rb') as f:
+        for i,line in enumerate(f):
+            line = line.decode("ascii", "ignore")
+            for rule in ruleset:
+                label,is_regex,pattern = rule
+                if is_regex:
+                    if bool(re.search(pattern, line)):
+                        matches.append((label, pattern, i))
+                else:
+                    if pattern in line or pattern.lower() in line or sanitize(pattern) in line:
+                        matches.append((label, pattern, i))
+
+    # Print any matches
+    for label, pattern, line_i in matches:
+            print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}' on line {i}")
 
 
 if __name__ == "__main__":
-	# Given any directory, scour it for any trace of cryptocurrency usage and / or crypto programs / keyfiles
-	# Optimized for speed and giving reliable indicators if there is something worth investigating on a given drive.
-	# Used to iterate through all files manually, and also check the contents of them for any possible private keys,
-	# then manually try those against the bitcoin API. This was very costly and didn't produce any results,
-	# so we're going with the much faster, flag-if-anything-comes-up (since this is rare) approach.
+    # Given any directory, scour it for any trace of cryptocurrency usage and / or crypto programs / keyfiles
+    # Optimized for speed and giving reliable indicators if there is something worth investigating on a given drive.
+    # Used to iterate through all files manually, and also check the contents of them for any possible private keys,
+    # then manually try those against the bitcoin API. This was very costly and didn't produce any results,
+    # so we're going with the much faster, flag-if-anything-comes-up (since this is rare) approach.
 
-	output_dir = sys.argv[1]
-	index_fpath = output_dir + "/" + "filesystem.index"
-	keys = set({})
+    output_dir = sys.argv[1]
+    index_fpath = output_dir + "/" + "filesystem.index"
+    keys = set({})
 
+    print("Checking Index Filepaths against Rulesets...")
 
-	print("Checking Index Filepaths against Rulesets...")
+    try:
+        with open(index_fpath, "r") as f:
+            # Iterate directly through it and check filenames line by line.
+            fpaths = [line.strip() for line in f.readlines()]
+    except FileNotFoundError:
+        fpaths = filesystem_utils.fpaths(output_dir)
 
-	with open(index_fpath, "r") as f:
-		# Iterate directly through it and check filenames line by line.
-		fpaths = [line.strip() for line in f.readlines()]
+    for line in tqdm(fpaths):
+        fpath = line.split(", ")[0]
 
-	for line in tqdm(fpaths):
-		fpath = line.split(", ")[0]
+        # Check filepath against our rules
+        apply_ruleset(fpath)
 
-		# Check filepath against our rules
-		apply_ruleset(fpath)
+    print("Checking Index Filepath Contents against Rulesets...")
+    with tqdm(bar_format='{desc}', position=0) as desc_pbar:
+        for line in tqdm(fpaths):
+            fpath = line.split(", ")[0]
+            desc_pbar.set_description(fpath[-100:])
+
+            # Check file contents against our rules
+            #print(fpath)
+            apply_ruleset_in_file(fpath)
 
 
 

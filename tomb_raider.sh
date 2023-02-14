@@ -243,7 +243,7 @@ if [[ $skip_raid -eq 0 ]]; then #don't skip
   echo "Testdisk and PhotoRec acquired, now Raiding and creating new Tomb Filesystem from recovered data."
   echo "This will Process, Condense, Remove Duplicates, and Organize all found files into the Tomb Filesystem."
   #echo "Processing, Condensing, Indexing, and removing Duplicates or Known files in Testdisk Filesystem."
-  python3 $original_dir/raid_filesystem.py $testdisk_dir $photorec_dir $output_dir $known_md5s
+  python3.9 $original_dir/raid_filesystem.py $testdisk_dir $photorec_dir $output_dir $known_md5s
   tomb_n=$(find $output_dir -type f | wc -l)
   condense_perc=$(bc <<<"scale=2;$tomb_n/($testdisk_n+$photorec_n)*100")
   echo "Tomb Filesystem Complete. New File Count: $tomb_n. This has been condensed to $condense_perc% of the original size."
@@ -253,7 +253,7 @@ fi
 if [[ $skip_crypto -eq 0 ]]; then #don't skip
   echo "Checking drive for any evidence of cryptocurrency or bitcoin."
   echo "Any filepaths matching rulesets will appear as matches."
-  python3 $original_dir/crypto_salvager.py $output_dir
+  python3.9 $original_dir/crypto_salvager.py $output_dir
 fi
 
 # CLEAN UP

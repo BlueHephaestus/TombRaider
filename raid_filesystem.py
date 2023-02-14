@@ -2,7 +2,7 @@ import sys
 import os
 import re
 from filesystem_utils import *
-from tqdm import tqdm
+#from tqdm import tqdm
 from filter_utils import *
 from hash_utils import *
 import numpy as np
