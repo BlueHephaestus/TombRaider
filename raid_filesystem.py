@@ -130,7 +130,9 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
         # HASH CHECKS
         # First check if we can delete it
         # This will check both our list of knowns, and the one we've accumulated since the program started
-        digest = md5(fpath)
+        try:
+            digest = md5(fpath)
+        except: continue
         if isknown(digest) or isfound(digest):
             os.remove(fpath)
             continue
