@@ -132,31 +132,40 @@ def apply_ruleset_in_file(fpath):
     if not os.path.exists(fpath): return
     if not os.path.isfile(fpath): return # handles named pipes and fake files
     mb_file_size = os.path.getsize(fpath)/1e6
-    large_file = mb_file_size > 1024
+    large_file = mb_file_size > 1024 # 1GB
     chunk_size = 1024 * 1024  # 1 MB, more or less optimal from my tests
     overlap_size = 1024  # 1 KB (you might need to adjust this based on your data and patterns)
 
     with open(fpath, 'rb') as f:
         if large_file: pbar = tqdm(total=mb_file_size, unit="MB")
 
-        buffer = b""
+        overlap = b""
         line_i = 0
         while True:
             chunk = f.read(chunk_size)
             if large_file: pbar.update(chunk_size/1e6)
-            if not chunk:
+            if not chunk and not overlap:
                 break
 
-            buffer += chunk
-            lines = buffer.split(b'\n')
-            buffer = lines.pop()
+            chunk = overlap + chunk
+            lines = chunk.split(b'\n')
+
+            # If there's more data, keep the last line as overlap into next chunk
+            if len(lines) > 1:
+                overlap = lines.pop()
+            else:
+                overlap = b""
+
+            for i,line in enumerate(lines):
+                lines[i] = line.decode("ascii", "ignore")
+
             for rule in ruleset:
                 label, is_regex, pattern, context_pattern = rule
                 if not is_regex:
                     pattern, pattern_lower, pattern_sanitize = pattern
 
                 for line in lines:
-                    line = line.decode("ascii", "ignore")
+                    #line = line.decode("ascii", "ignore")
 
                     if is_regex:
                         if pattern.search(line):
@@ -167,13 +176,10 @@ def apply_ruleset_in_file(fpath):
                             matches.append((line_i, line, rule))
                     line_i+=1
 
-            # Append overlap from next chunk
-            buffer += f.read(overlap_size)
-
     if large_file: pbar.close()
 
 
-    # # Alternate method, line based approach
+    # Alternate method, line based approach
     # with open(fpath,'rb') as f:
     #     #lines = f.read()#.decode("ascii","ignore"
     #     #try:
@@ -185,21 +191,33 @@ def apply_ruleset_in_file(fpath):
     #     if large_file: mb_read = 0
     #
     #     pbar = tqdm(total=mb_file_size, disable=not large_file, unit="MB")
-    #     for line_i, line in enumerate(f):
+    #     line_i = 0
+    #     for line in f:
     #         line = line.decode("ascii","ignore")
+    #         if len(line) > 10000:print(len(line))
     #         if large_file:
     #             #mb_read += len(line) / 10e6
     #             pbar.update(len(line)/1e6)
     #
     #         for rule in ruleset:
-    #             label,is_regex,pattern,_ = rule
+    #             label, is_regex, pattern, context_pattern = rule
     #             if is_regex:
-    #                 if bool(re.search(pattern, line)):
+    #                 if pattern.search(line):
     #                     matches.append((line_i, line, rule))
     #             else:
     #                 pattern, pattern_lower, pattern_sanitize = pattern
     #                 if pattern in line or pattern_lower in line or pattern_sanitize in line:
     #                     matches.append((line_i, line, rule))
+    #
+    #             #
+    #             # if is_regex:
+    #             #     if bool(re.search(pattern, line)):
+    #             #         matches.append((line_i, line, rule))
+    #             # else:
+    #             #     pattern, pattern_lower, pattern_sanitize = pattern
+    #             #     if pattern in line or pattern_lower in line or pattern_sanitize in line:
+    #             #         matches.append((line_i, line, rule))
+    #         line_i += 1
     #     pbar.close()
 
     # Print any matches with context, if there are any.
@@ -335,7 +353,7 @@ if __name__ == "__main__":
 
     print("Checking Index Filepath Contents against Rulesets...")
     with tqdm(bar_format='{desc}', position=0) as desc_pbar:
-        for line in tqdm(fpaths):
+        for line in tqdm(fpaths[138700:]):
             fpath = line.split(", ")[0]
             desc_pbar.set_description(fpath[-100:])
 
