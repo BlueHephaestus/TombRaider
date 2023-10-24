@@ -353,7 +353,7 @@ if __name__ == "__main__":
 
     print("Checking Index Filepath Contents against Rulesets...")
     with tqdm(bar_format='{desc}', position=0) as desc_pbar:
-        for line in tqdm(fpaths[138700:]):
+        for line in tqdm(fpaths):
             fpath = line.split(", ")[0]
             desc_pbar.set_description(fpath[-100:])
 
