@@ -126,27 +126,48 @@ def apply_ruleset(fpath):
     for label, pattern in matches:
         print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}'")
 
-def apply_ruleset_in_file(fpath):
-    matches = []
-    #candidates = re.findall(b'\x01\x01\x04\x20(.{32})', f.read())
-    if not os.path.exists(fpath): return
+GB = 1024*1024*1024
+MB = 1024*1024
+KB = 1024
+def file_chunked_lines(fpath, large_file_size=GB, chunk_size=MB):
+    """
+    Given a file, read the file in chunks, and yield the lines separated by \n in each chunk,
+        so that we are iterating over lines in the file, but not loading the whole file into memory,
+        instead reading it in chunks of size chunk_size, then separating it into lines,
+        and keeping the last line of each chunk so that we do not miss any matches that may be split across chunks.
+
+    :param fpath: The file to read
+    :param large_file_size: If the file is larger than this, we will use a progress bar (Bytes)
+    :param chunk_size: The size of each chunk to read  (Bytes)
+    :return: Yields lines from the file
+    """
     if not os.path.isfile(fpath): return # handles named pipes and fake files
-    mb_file_size = os.path.getsize(fpath)/1e6
-    large_file = mb_file_size > 1024 # 1GB
-    chunk_size = 1024 * 1024  # 1 MB, more or less optimal from my tests
-    overlap_size = 1024  # 1 KB (you might need to adjust this based on your data and patterns)
+
+    # Check if file is large
+    file_size = os.path.getsize(fpath)
+    large_file = file_size > large_file_size
+
+    # If not large, skip all this and read it all into memory
+    # if not large_file:
+    #     with open(fpath, 'rb') as f:
+    #         for line in f:
+    #             yield line
+    #     return
+    #
+    # If large, read in chunks with progress bar
+
+    # If large, use a progress bar
+    if large_file:
+        pbar = tqdm(total=file_size/MB, unit="MB")
 
     with open(fpath, 'rb') as f:
-        if large_file: pbar = tqdm(total=mb_file_size, unit="MB")
-
         overlap = b""
-        line_i = 0
         while True:
             chunk = f.read(chunk_size)
-            if large_file: pbar.update(chunk_size/1e6)
+            if large_file:
+                pbar.update(chunk_size/MB)
             if not chunk and not overlap:
                 break
-
             chunk = overlap + chunk
             lines = chunk.split(b'\n')
 
@@ -156,27 +177,31 @@ def apply_ruleset_in_file(fpath):
             else:
                 overlap = b""
 
-            for i,line in enumerate(lines):
-                lines[i] = line.decode("ascii", "ignore")
+            for line in lines:
+                yield line
+    if large_file:
+        pbar.close()
+    return
 
-            for rule in ruleset:
-                label, is_regex, pattern, context_pattern = rule
-                if not is_regex:
-                    pattern, pattern_lower, pattern_sanitize = pattern
+def apply_ruleset_in_file(fpath):
+    matches = []
+    #candidates = re.findall(b'\x01\x01\x04\x20(.{32})', f.read())
+    for line_i, line in enumerate(file_chunked_lines(fpath)):
+        line = line.decode("ascii", "ignore")
+        for rule in ruleset:
+            label, is_regex, pattern, context_pattern = rule
+            #if not is_regex:
+            #line = line.decode("ascii", "ignore")
 
-                for line in lines:
-                    #line = line.decode("ascii", "ignore")
+            if is_regex:
+                if pattern.search(line):
+                    matches.append((line_i, line, rule))
 
-                    if is_regex:
-                        if pattern.search(line):
-                            matches.append((line_i, line, rule))
-
-                    else:
-                        if pattern in line or pattern_lower in line or pattern_sanitize in line:
-                            matches.append((line_i, line, rule))
-                    line_i+=1
-
-    if large_file: pbar.close()
+            else:
+                pattern, pattern_lower, pattern_sanitize = pattern
+                if pattern in line or pattern_lower in line or pattern_sanitize in line:
+                    matches.append((line_i, line, rule))
+        line_i+=1
 
 
     # Alternate method, line based approach
@@ -248,37 +273,8 @@ def apply_ruleset_in_file(fpath):
 candidate_pattern = re.compile(b'\x01\x01\x04\x20(.{32})')
 def key_hex_candidates(fpath):
     candidates = []
-    if not os.path.exists(fpath): return candidates
-    if not os.path.isfile(fpath): return candidates# handles named pipes and fake files
-    """
-    try:
-        with open(fpath, "rb") as f:
-
-            candidates= re.findall(candidate_pattern, f.read())
-    except MemoryError:
-        print(f"Encountered Very Large File {fpath} ({round(os.path.getsize(fpath)/1000000000, 2)} GB)\n \
-			  Attempting a Memory Mapping to read through it, this may take a moment.")
-        try:
-            with open(fpath, 'r+') as f:
-                data = mmap.mmap(f.fileno(), 0)
-                candidates = re.findall(b'\x01\x01\x04\x20(.{32})', data)
-            print("Successfully Read File, Continuing")
-        except:
-            print("Memory Map Read failed, skipping")
-
-    except OSError:
-        #print(f"Unknown error encountered with File {fpath}: {traceback.format_exc()}, skipping")
-        pass
-    """
-
-    candidates = []
-    try:
-        with open(fpath, "rb") as f:
-            for line in f:
-                candidates.extend(re.findall(candidate_pattern, line))
-    except OSError:
-        pass
-
+    for line_i, line in enumerate(file_chunked_lines(fpath)):
+        candidates.extend(re.findall(candidate_pattern, line))
     return candidates
 
 
