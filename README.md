@@ -106,8 +106,7 @@ For a given block device, disk image, or connected storage device, Tomb Raider w
 
 The following video gives a full walkthrough of how this tool works, however we will break down the steps here as well.
 ### BSides Las Vegas 2022 Presentation
-https://www.youtube.com/watch?v=je-97WMp8KA&pp=ygUaYnNpZGVzIGx2IDIwMjIgdG9tYiByYWlkZXI%3D
-<iframe width="1280" height="720" src="https://www.youtube.com/embed/je-97WMp8KA" title="GF - Tomb Raider - Automating Data Recovery and Digital Forensics" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+[![Tomb Raider - Automating Data Recovery and Digital Forensics](https://img.youtube.com//vi/je-97WMp8KA/0.jpg)](https://www.youtube.com/watch?v=je-97WMp8KA&pp=ygUaYnNpZGVzIGx2IDIwMjIgdG9tYiByYWlkZXI%3D)
 
 This tool would not exist without the already amazing tools out there, such as safecopy, testdisk, and more, many of which form the core parts of what this automates, tying many of them together. The full list of tools and resources can be found at the bottom of the page, so we will not go into each of them here.
 
@@ -148,6 +147,10 @@ This is the next-to-final step, which makes use of multiple tags and search crit
 As these are searched, any matches are output and highlighted in red to the terminal. Due to the large amount of tags, there are often false positives due to webpages or cache files having mention of bitcoin or other cryptocurrencies, so it's important to check each result to ensure it's valid. This is also why the output is highlighted in red, so that it's easy to see and identify.
 
 This feature may be modified to be optional considering the highly verbose nature of its output.
+
+## 6. Archiving
+
+This is the final step, which takes the output of the raiding process and compresses it into a tarball, which can then be easily compressed using `lz4` to reduce disk space for long storage. This was used over gzip or bzip because experiments found that applying those to entire filesystems would hang for days and often never complete, whereas lz4 can provide progress indicators and work through the large filesystems relatively quickly, while still offering good compression rates.
 
 # Tools Used
 
