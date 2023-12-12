@@ -94,6 +94,53 @@ for i,rule in enumerate(ruleset):
     else:
         ruleset[i].append("ew no")
 
+# import unicodedata
+# def to_ascii(text):
+#     # Normalize to Unicode NFC form and remove non-ASCII characters
+#     return ''.join(char for char in unicodedata.normalize('NFC', text) if ord(char) < 128)
+def filter_to_ordinal_range(text, min_ord, max_ord):
+    return ''.join(char for char in text if min_ord <= ord(char) <= max_ord)
+
+
+def is_known_noise(line, idx, pattern):
+    # Returns true if the pattern is a noise pattern
+    # We don't want to match on these
+    # We have some hardcoded checks to reduce these for saving time looking through results
+
+    # skip this whole thing if it's not in the checks
+    if pattern.lower() not in ["neon.exe", "bitcoin"]: return False
+
+    BITCOIN_NOISE_CONTEXTS = [
+        "blog.bitcoin.cz",
+        ".fa-bitcoin",
+        ".glyphicon-bitcoin",
+        "bitcoingeoimirc",
+        "bitcoinimirc",
+        "bitcoingeoirc",
+        "[bitcoin-image]",
+        "[bitcoin-url]",
+        "bitcoinbolocaltochrome",
+        "bitcoinbolocall"
+        "bitcoin wallet [trezor]",
+        
+    ]
+
+    # check if neon rather than edge-neon
+    pattern = pattern.lower()
+    line = line.lower()
+    prefix = line[idx - 16:idx]
+    suffix = line[idx + len(pattern):idx + len(pattern) + 16]
+    context = filter_to_ordinal_range(prefix + pattern + suffix, 32, 128) # because yes, i've had ones filled with control codes.
+    if "neon.exe" == pattern and "edge-neon.exe" in context:
+        return True
+
+    if "bitcoin" == pattern:
+        for noise_context in BITCOIN_NOISE_CONTEXTS:
+            if noise_context in context: return True
+
+    return False
+
+
 # Preprocess these string ops so we don't repeat them a million times
 for i,rule in enumerate(ruleset):
     label, is_regex, pattern, context_pattern = rule
@@ -246,12 +293,11 @@ def apply_ruleset_in_file(fpath):
     #     pbar.close()
 
     # Print any matches with context, if there are any.
-    if len(matches) > 0:
-        print()
-        print(f"MATCHES FOUND FOR FILEPATH {colored(fpath,'green')}:")
+
+    print_strs = []
     for line_i, line, (label, is_regex, pattern,context_pattern) in matches:
         if is_regex:
-            print(f"\t{pattern} match:{colored(re.findall(pattern, line), 'red')}")
+            print_strs.append(f"\t{pattern} match:{colored(re.findall(pattern, line), 'red')}")
         else:
             pattern, pattern_lower, pattern_sanitize = pattern
             s = ""
@@ -262,11 +308,18 @@ def apply_ruleset_in_file(fpath):
             elif pattern_sanitize in line:
                 p = pattern_sanitize
             idx = line.index(p)
-            #s = f"\t{p} match:" + lines[idx - 80:idx] + colored(lines[idx:idx + len(p)], 'red') + lines[idx + len(p):idx + 80 + len(p)]
-            s = f"\t{p} match:" + line[max(idx - 80,0):idx] + colored(line[idx:(idx + len(p))], 'red') + line[(idx + len(p)):idx + 80 + len(p)]
-            s = s.replace('\r', ' ').replace('\n', ' ')
-            print(s)
+            if not is_known_noise(line, idx, p):
+                #s = f"\t{p} match:" + lines[idx - 80:idx] + colored(lines[idx:idx + len(p)], 'red') + lines[idx + len(p):idx + 80 + len(p)]
+                s = f"\t{p} match:" + line[max(idx - 80,0):idx] + colored(line[idx:(idx + len(p))], 'red') + line[(idx + len(p)):idx + 80 + len(p)]
+                s = s.replace('\r', ' ').replace('\n', ' ')
+                print_strs.append(s)
         #print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}' on line {i}")
+
+    if len(print_strs) > 0:
+        print()
+        print(f"MATCHES FOUND FOR FILEPATH {colored(fpath,'green')}:")
+        for print_str in print_strs:
+            print(print_str)
 
 
 
@@ -332,6 +385,7 @@ if __name__ == "__main__":
     keys = set({})
 
     print("Checking Index Filepaths against Rulesets...")
+    print(index_fpath)
 
     try:
         with open(index_fpath, "r") as f:
@@ -341,15 +395,15 @@ if __name__ == "__main__":
         print("No index found, creating one...")
         fpaths = filesystem_utils.fpaths(output_dir)
 
-    for line in tqdm(fpaths):
-        fpath = line.split(", ")[0]
-
-        # Check filepath against our rules
-        apply_ruleset(fpath)
+    # for line in tqdm(fpaths):
+    #     fpath = line.split(", ")[0]
+    #
+    #     # Check filepath against our rules
+    #     apply_ruleset(fpath)
 
     print("Checking Index Filepath Contents against Rulesets...")
     with tqdm(bar_format='{desc}', position=0) as desc_pbar:
-        for line in tqdm(fpaths):
+        for line in tqdm(fpaths[553900:]):
             fpath = line.split(", ")[0]
             desc_pbar.set_description(fpath[-100:])
 
