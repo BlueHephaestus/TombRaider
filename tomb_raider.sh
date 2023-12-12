@@ -204,11 +204,11 @@ if [[ $skip_testdisk -eq 0 ]]; then # don't skip
   # Get the filesystem on the drive to retain any file metadata and organization, if possible
   # MMLS - Get the number of allocated partitions on disk.img, if any (has to be alloc to have filesystem)
   # This is what we use to determine an upper bound for how many partitions will have recoverable fs's on testdisk.
-  # tested via running it on 5 (if not more) of my own salvaged hard disks. This will include any boot files, etc.
+0  # tested via running it on 5 (if not more) of my own salvaged hard disks. This will include any boot files, etc.
   # More info in README
   fs_partitions=$((`mmls -a $image | wc -l`-5))
   if [[ $fs_partitions -lt 0 ]]; then
-    fs_partitions=0
+    fs_partitions=
   fi
   echo "Found $fs_partitions Possible Filesystem Partitions on $image."
 
