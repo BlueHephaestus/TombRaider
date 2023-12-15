@@ -77,7 +77,7 @@ ruleset = [
 ["Zel Core", False, "zelcore.exe"],
 ["Zel Core Portable", False, "zelcore-portable.exe"],
 
-# our own customs
+# # our own customs
 ["Bitcoin Anything", False, "Bitcoin"],
 ["Dogecoin Anything", False, "Dogecoin"],
 ["Ethereum Anything", False, "Ethereum"],
@@ -114,23 +114,30 @@ def is_known_noise(line, idx, pattern):
         "blog.bitcoin.cz",
         ".fa-bitcoin",
         ".glyphicon-bitcoin",
+        "glyphicon%2dbitcoin",
         "bitcoingeoimirc",
         "bitcoinimirc",
         "bitcoingeoirc",
         "[bitcoin-image]",
         "[bitcoin-url]",
+        "src=\"bitcoin.png\"",
         "bitcoinbolocaltochrome",
-        "bitcoinbolocall"
+        "bitcoinbolocall",
         "bitcoin wallet [trezor]",
         
     ]
 
     # check if neon rather than edge-neon
     pattern = pattern.lower()
-    line = line.lower()
-    prefix = line[idx - 16:idx]
-    suffix = line[idx + len(pattern):idx + len(pattern) + 16]
-    context = filter_to_ordinal_range(prefix + pattern + suffix, 32, 128) # because yes, i've had ones filled with control codes.
+
+    # because yes, i've had ones filled with control codes.
+    # we redo the index after converting to readable chars.
+    line = filter_to_ordinal_range(line, 32, 128).lower()
+    idx = line.index(pattern)
+    prefix = line[max(idx - 80,0):idx]
+    suffix = line[idx + len(pattern):min(idx + len(pattern) + 80, len(line))]
+    context = prefix + pattern + suffix
+    context = filter_to_ordinal_range(context, 32, 128).lower()
     if "neon.exe" == pattern and "edge-neon.exe" in context:
         return True
 
@@ -250,48 +257,6 @@ def apply_ruleset_in_file(fpath):
                     matches.append((line_i, line, rule))
         line_i+=1
 
-
-    # Alternate method, line based approach
-    # with open(fpath,'rb') as f:
-    #     #lines = f.read()#.decode("ascii","ignore"
-    #     #try:
-    #     #lines = f.read().decode("ascii","ignore")
-    #     #except MemoryError:
-    #     #print("Encountered Memory Error on decode, skipping...")
-    #     #return
-    #     # TODO change back to full read if not large file???
-    #     if large_file: mb_read = 0
-    #
-    #     pbar = tqdm(total=mb_file_size, disable=not large_file, unit="MB")
-    #     line_i = 0
-    #     for line in f:
-    #         line = line.decode("ascii","ignore")
-    #         if len(line) > 10000:print(len(line))
-    #         if large_file:
-    #             #mb_read += len(line) / 10e6
-    #             pbar.update(len(line)/1e6)
-    #
-    #         for rule in ruleset:
-    #             label, is_regex, pattern, context_pattern = rule
-    #             if is_regex:
-    #                 if pattern.search(line):
-    #                     matches.append((line_i, line, rule))
-    #             else:
-    #                 pattern, pattern_lower, pattern_sanitize = pattern
-    #                 if pattern in line or pattern_lower in line or pattern_sanitize in line:
-    #                     matches.append((line_i, line, rule))
-    #
-    #             #
-    #             # if is_regex:
-    #             #     if bool(re.search(pattern, line)):
-    #             #         matches.append((line_i, line, rule))
-    #             # else:
-    #             #     pattern, pattern_lower, pattern_sanitize = pattern
-    #             #     if pattern in line or pattern_lower in line or pattern_sanitize in line:
-    #             #         matches.append((line_i, line, rule))
-    #         line_i += 1
-    #     pbar.close()
-
     # Print any matches with context, if there are any.
 
     print_strs = []
@@ -395,15 +360,15 @@ if __name__ == "__main__":
         print("No index found, creating one...")
         fpaths = filesystem_utils.fpaths(output_dir)
 
-    # for line in tqdm(fpaths):
-    #     fpath = line.split(", ")[0]
-    #
-    #     # Check filepath against our rules
-    #     apply_ruleset(fpath)
+    for line in tqdm(fpaths):
+        fpath = line.split(", ")[0]
+
+        # Check filepath against our rules
+        apply_ruleset(fpath)
 
     print("Checking Index Filepath Contents against Rulesets...")
     with tqdm(bar_format='{desc}', position=0) as desc_pbar:
-        for line in tqdm(fpaths[553900:]):
+        for line in tqdm(fpaths):
             fpath = line.split(", ")[0]
             desc_pbar.set_description(fpath[-100:])
 
