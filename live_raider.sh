@@ -6,7 +6,7 @@ get_devices() {
   devices=()
   while read -r line; do
     if [[ $line == *'disk'* && $line != *'loop'* ]]; then
-      devices+=($(echo "$line" | awk '{print $1}'))
+      devices+=($(echo "$line" | awk '{print $1}' | tr -d '├─└─'))
     fi
   done < <(lsblk)
   echo "${devices[@]}"
@@ -64,8 +64,7 @@ get_device_name() {
   return
 }
 done=()
-excluded=("sda" "sdb" "sdc" "sdd" "nvme0n1")
-try_main=$1
+excluded=("sda" "sdb" "sdc" "sdd" "sdl" "sdm" "nvme0n1")
 
 #      # Mount device
 #      echo "Mounting /dev/$device"
@@ -117,13 +116,39 @@ raid_device(){
     while IFS= read -r line; do
       # Create subdirectory for partition
       partition_name=$(get_device_name "$line")
+      partition_i=${line: -1}
+      partition_path=$device_path$partition_i
 
       mkdir -p "./$partition_name"
       cd "./$partition_name"
-      echo -e "\tPort $device_port: Running Testdisk to attempt to recover files on $device_name ($line: $partition_name)"
+#      echo -e "\tPort $device_port: Running Testdisk to attempt to recover files on $device_name ($line: $partition_name)"
+#      echo -e "\tPort $device_port: Running Testdisk to attempt to recover files on $device_name ($line: $partition_name)"
 
       # Copy from this partition to target directory (current directory)
-      testdisk /log /cmd "$device_path" advanced,"${line: -1}",list,filecopy &> /dev/null
+      #testdisk /log /cmd "$device_path" advanced,"${line: -1}",list,filecopy &> /dev/null
+
+      # Make a directory to mount this to
+      mount_dir="/mnt/$device_port/$partition_name"
+      mkdir -p $mount_dir
+
+      # Mount it (or attempt to)
+      mount $partition_path $mount_dir
+
+      # Check the exit status of the mount command
+      if [ $? -eq 0 ]; then
+          # If successful, copy files from it.
+#          echo "Mount successful."
+          echo -e "\tPort $device_port: Mount Successful, copying files on $device_name ($line: $partition_name)"
+          cp -rup $mount_dir .
+          umount $mount_dir
+          rm -rf $mount_dir
+
+      else
+          # If fail, try to use testdisk instead
+#          echo "Mount failed."
+          echo -e "\tPort $device_port: Mount Failed, Testdisk-ing files on $device_name ($line: $partition_name)"
+          testdisk /log /cmd "$device_path" advanced,"",list,filecopy &> /dev/null
+      fi
       cd ..
     done <<< "$partitions"
   fi
