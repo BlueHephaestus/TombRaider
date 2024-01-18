@@ -26,6 +26,17 @@ Also also, using a smaller more naive md5 hash of just the first CHUNK_SIZE and 
     
 So now it runs in what used to take 2 hours in about 23 seconds on my test OS of ~742,000 files. 
 So it's a little faster.
+
+UPDATE
+
+We tried applying it to a larger set and found a surprising result, the index gets too big and it suddenly
+    slows way down, at about 300,000 files (goes from 30k / s to 30/s). Applying bloom filters here 
+    drastically smooths out the curve (goes from 10k / s to 1k / s).
+    keeping it at a slower but more consistent rate, even though that does rate reduce as there are more hits on the index.
+    which is unavoidable while we still use the index to check for duplicates.
+    
+Additionally reducing the error rate for the bloom filter helps too. 
+FUTURE IDEA is to incorporate a fixed size of index, and if it gets too big, we just start a new one.
 """
 
 def process(filesystem_root):
@@ -35,8 +46,8 @@ def process(filesystem_root):
 
     # Load bloom filter
     # bloom_filter = BloomFilter(max_elements=150_000_000, error_rate=0.001, filename=('known.bloom',-1), start_fresh=False) # 132 mil known hashes
-    # fpath_iter = fpaths(filesystem_root)
-    # bloom_filter = BloomFilter(max_elements=len(fpath_iter), error_rate=1e-5)
+    fpath_iter = fpaths(filesystem_root)
+    bloom_filter = BloomFilter(max_elements=len(fpath_iter), error_rate=1e-9)
 
     # Load all hashes
     # print(f"Loading known hashes file {known_md5s_fname}. This may take a moment...")
@@ -71,7 +82,7 @@ def process(filesystem_root):
     # Do one pass, eliminating as many files as possible if we don't need them as we go.
     # This, I've found, is the best way to maximize speed and minimize disk space used.
     print(f"Removing Duplicates and Known Files...")
-    for fpath in tqdm(fpaths(filesystem_root)):
+    for fpath in tqdm(fpath_iter):
         # HASH CHECKS
         # First check if we can delete it based on the bloom filter
         # Most of the time we will not delete it since they're often not in the bloom filter
@@ -82,22 +93,22 @@ def process(filesystem_root):
         total += 1
         total_size += size
         # digest = md5(fpath)
-        # if digest in bloom_filter:
+        if digest in bloom_filter:
             # Might be in the bloom filter, so we have to check the definitive checks
             # this is costly part, try to make it as fast as possible
             # Fast certainty check first
             # have to do full md5 for the known ones
             # hits += 1
-        if isfound(digest):
-            #if isknown(digest) or isfound(digest):
-            # If it's in there, delete it
-            removed += 1
-            removed_size += size
-            # os.remove(fpath)
-            continue
+            if isfound(digest):
+                #if isknown(digest) or isfound(digest):
+                # If it's in there, delete it
+                removed += 1
+                removed_size += size
+                os.remove(fpath)
+                continue
         # Otherwise it's not in the bloom filter, so we have to add it to the bloom filter and index
         # clever conditionals so that this will only happen if it's not in either
-        # bloom_filter.add(digest)
+        bloom_filter.add(digest)
         index[digest] = fpath
 
     # OI FUTURE SELF
