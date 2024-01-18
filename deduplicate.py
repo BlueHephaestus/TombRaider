@@ -58,6 +58,8 @@ def process(filesystem_root):
     #     # Wish they could just have a contains method but oh heckin well
     #     i = np.searchsorted(known_md5s, digest)
     #     return i != 0 and i != n and known_md5s[i] == digest
+    total = 0
+    total_size = 0
 
     removed = 0
     removed_size = 0
@@ -76,6 +78,9 @@ def process(filesystem_root):
         if not os.path.isfile(fpath):continue
         #if os.path.getsize(fpath) > 1e8: continue
         digest = fast_lossy_md5(fpath)
+        size = os.path.getsize(fpath)
+        total += 1
+        total_size += size
         # digest = md5(fpath)
         # if digest in bloom_filter:
             # Might be in the bloom filter, so we have to check the definitive checks
@@ -87,17 +92,19 @@ def process(filesystem_root):
             #if isknown(digest) or isfound(digest):
             # If it's in there, delete it
             removed += 1
-            removed_size += os.path.getsize(fpath)
-            os.remove(fpath)
+            removed_size += size
+            # os.remove(fpath)
             continue
         # Otherwise it's not in the bloom filter, so we have to add it to the bloom filter and index
         # clever conditionals so that this will only happen if it's not in either
         # bloom_filter.add(digest)
-        index[fpath] = digest
+        index[digest] = fpath
 
+    # OI FUTURE SELF
+    # WE JUST REALIZED THE CHECK WAS WRONG. REDO ALL THE BLOOM FILTER TESTS TO SEE IF IT IS BETTER NOW.
     print("Writing index to disk...")
     write_index(index, filesystem_root + "/" + "filesystem.index")
-    print(f"Removed {removed} files totalling {removed_size/1e9}GB.")
+    print(f"Removed {removed}/{total} files ({(removed/total)*100:.2f}%) totalling {removed_size/1e9:.2f}GB/{total_size/1e9:.2f}GB ({((removed_size/total_size))*100:.2f}% of total).")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
