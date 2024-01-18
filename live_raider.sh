@@ -63,8 +63,25 @@ get_device_name() {
   echo "$formatted_name"
   return
 }
+get_device_port(){
+  device=$1
+  # Extract ID_PATH to use for getting device port
+  udev_output=$(udevadm info --query=all "/dev/$device")
+  id_path=$(echo "$udev_output" | grep -oP 'E: ID_PATH=\K.*')
+  device_port=$(python3.9 $original_dir/parse_usb_hub_uuid.py $id_path)
+  echo "$device_port"
+  return
+}
+echo_g() {
+    echo -e "\e[32m$1\e[0m"
+}
+
+echo_r() {
+    echo -e "\e[31m$1\e[0m"
+}
+
 done=()
-excluded=("sda" "sdb" "sdc" "sdd" "sdl" "sdm" "nvme0n1")
+excluded=("sda" "sdb" "sdc" "sdd" "sdl" "sdm" "sd" "nvme0n1")
 
 #      # Mount device
 #      echo "Mounting /dev/$device"
@@ -84,17 +101,11 @@ raid_device(){
   device_name=$2
   device_path=$3
 
+  device_port=$(get_device_port $device)
+
   original_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-  udev_output=$(udevadm info --query=all "/dev/$device")
-
-  # Extract ID_PATH to use for getting device port
-  id_path=$(echo "$udev_output" | grep -oP 'E: ID_PATH=\K.*')
-  device_port=$(python3.9 $original_dir/parse_usb_hub_uuid.py $id_path)
-
   device_path="/dev/$device"
   echo "Port $device_port: Device Name: $device_name ($device_path)"
-
-
 
   # Get the number of partitions on this device
   fs_partitions=$(($(mmls -a "$device_path" | wc -l) - 5))
@@ -138,7 +149,7 @@ raid_device(){
       if [ $? -eq 0 ]; then
           # If successful, copy files from it.
 #          echo "Mount successful."
-          echo -e "\tPort $device_port: Mount Successful, copying files on $device_name ($line: $partition_name)"
+          echo_g "\tPort $device_port: Mount Successful, copying files on $device_name ($line: $partition_name)"
           cp -rup $mount_dir .
           umount $mount_dir
           rm -rf $mount_dir
@@ -146,13 +157,16 @@ raid_device(){
       else
           # If fail, try to use testdisk instead
 #          echo "Mount failed."
-          echo -e "\tPort $device_port: Mount Failed, Testdisk-ing files on $device_name ($line: $partition_name)"
+          echo_r "\tPort $device_port: Mount Failed, Testdisk-ing files on $device_name ($line: $partition_name)"
           testdisk /log /cmd "$device_path" advanced,"",list,filecopy &> /dev/null
       fi
       cd ..
     done <<< "$partitions"
   fi
-  echo "Port $device_port: Done with $device_name ($device_path)"
+  echo_g "Port $device_port: Done with $device_name ($device_path)"
+
+  # Remove from running devices list
+  sed -i "/$device_port/d" "$original_dir/running_devices.txt"
   cd ..
 }
 while true; do
@@ -161,7 +175,18 @@ while true; do
     device_name=$(get_device_name $device)
     if [[ ! " ${excluded[@]} " =~ " $device " && ! " ${done[@]} " =~ "$device_name" ]]; then
 
-      raid_device $device $device_name $device_path &
+      original_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+      device_port=$(get_device_port $device)
+
+      # Check if the device port is already in the list
+      touch "$original_dir/running_devices.txt"
+      if grep -q $device_port "$original_dir/running_devices.txt"; then
+          echo "Device port $device_port is already running."
+      else
+          # Add the device port to the list if not and spawn new raid thread
+          echo $device_port >> "$original_dir/running_devices.txt"
+          raid_device $device $device_name $device_path &
+      fi
       # Don't do this device again
       done+=("$device_name")
       #echo "Done with $device_name"

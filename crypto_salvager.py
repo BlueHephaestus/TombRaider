@@ -159,26 +159,38 @@ for i,rule in enumerate(ruleset):
 def apply_ruleset(fpath):
     # Given a fpath, check it against all of our rules, and print any matches.
     matches = []
-    for rule in ruleset:
-        label,is_regex,pattern,_ = rule
-        if is_regex:
-            # Rule is Regex, apply and check
-            # No need to modify pattern since we already did that in the ruleset, plus if we did then we'd have
-            # to recompile. This just runs variants on the fpath instead. This will run all combinations as a result.
-            if bool(re.search(pattern, fpath)) or bool(re.search(pattern, fpath.lower())) or bool(re.search(pattern, sanitize(fpath))):
-                # pattern match, save this
-                matches.append((label, pattern))
-
-
+    delete = False
+    for line_i, line in enumerate(file_chunked_lines(fpath)):
+        line = line.decode("ascii", "ignore")
+        if "ethereum" in line:
+            delete = True
+            break
         else:
-            # Rule is simple substring check, check lowercase and sanitized versions as well
-            pattern, pattern_lower, pattern_sanitize = pattern
-            if pattern in fpath or pattern_lower in fpath or pattern_sanitize in fpath:
-                matches.append((label, pattern))
-
-    # Print any matches
-    for label, pattern in matches:
-        print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}'")
+            continue
+    if delete:
+        print(f"Deleting {fpath}")
+        os.remove(fpath)
+    return
+    # for rule in ruleset:
+    #     label,is_regex,pattern,_ = rule
+    #     if is_regex:
+    #         # Rule is Regex, apply and check
+    #         # No need to modify pattern since we already did that in the ruleset, plus if we did then we'd have
+    #         # to recompile. This just runs variants on the fpath instead. This will run all combinations as a result.
+    #         if bool(re.search(pattern, fpath)) or bool(re.search(pattern, fpath.lower())) or bool(re.search(pattern, sanitize(fpath))):
+    #             # pattern match, save this
+    #             matches.append((label, pattern))
+    #
+    #
+    #     else:
+    #         # Rule is simple substring check, check lowercase and sanitized versions as well
+    #         pattern, pattern_lower, pattern_sanitize = pattern
+    #         if pattern in fpath or pattern_lower in fpath or pattern_sanitize in fpath:
+    #             matches.append((label, pattern))
+    #
+    # # Print any matches
+    # for label, pattern in matches:
+    #     print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}'")
 
 GB = 1024*1024*1024
 MB = 1024*1024
@@ -200,6 +212,8 @@ def file_chunked_lines(fpath, large_file_size=GB, chunk_size=MB):
     # Check if file is large
     file_size = os.path.getsize(fpath)
     large_file = file_size > large_file_size
+    if large_file:
+        return
 
     # If not large, skip all this and read it all into memory
     # if not large_file:
@@ -240,51 +254,62 @@ def file_chunked_lines(fpath, large_file_size=GB, chunk_size=MB):
 def apply_ruleset_in_file(fpath):
     matches = []
     #candidates = re.findall(b'\x01\x01\x04\x20(.{32})', f.read())
+    delete = False
     for line_i, line in enumerate(file_chunked_lines(fpath)):
         line = line.decode("ascii", "ignore")
-        for rule in ruleset:
-            label, is_regex, pattern, context_pattern = rule
-            #if not is_regex:
-            #line = line.decode("ascii", "ignore")
-
-            if is_regex:
-                if pattern.search(line):
-                    matches.append((line_i, line, rule))
-
-            else:
-                pattern, pattern_lower, pattern_sanitize = pattern
-                if pattern in line or pattern_lower in line or pattern_sanitize in line:
-                    matches.append((line_i, line, rule))
-        line_i+=1
-
-    # Print any matches with context, if there are any.
-
-    print_strs = []
-    for line_i, line, (label, is_regex, pattern,context_pattern) in matches:
-        if is_regex:
-            print_strs.append(f"\t{pattern} match:{colored(re.findall(pattern, line), 'red')}")
+        if "ethereum" in line:
+            delete = True
+            break
         else:
-            pattern, pattern_lower, pattern_sanitize = pattern
-            s = ""
-            if pattern in line:
-                p = pattern
-            elif pattern_lower in line:
-                p = pattern_lower
-            elif pattern_sanitize in line:
-                p = pattern_sanitize
-            idx = line.index(p)
-            if not is_known_noise(line, idx, p):
-                #s = f"\t{p} match:" + lines[idx - 80:idx] + colored(lines[idx:idx + len(p)], 'red') + lines[idx + len(p):idx + 80 + len(p)]
-                s = f"\t{p} match:" + line[max(idx - 80,0):idx] + colored(line[idx:(idx + len(p))], 'red') + line[(idx + len(p)):idx + 80 + len(p)]
-                s = s.replace('\r', ' ').replace('\n', ' ')
-                print_strs.append(s)
-        #print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}' on line {i}")
-
-    if len(print_strs) > 0:
-        print()
-        print(f"MATCHES FOUND FOR FILEPATH {colored(fpath,'green')}:")
-        for print_str in print_strs:
-            print(print_str)
+            continue
+    if delete:
+        print(f"Deleting {fpath}")
+        os.remove(fpath)
+    return
+    #
+    #     for rule in ruleset:
+    #         label, is_regex, pattern, context_pattern = rule
+    #         #if not is_regex:
+    #         #line = line.decode("ascii", "ignore")
+    #
+    #         if is_regex:
+    #             if pattern.search(line):
+    #                 matches.append((line_i, line, rule))
+    #
+    #         else:
+    #             pattern, pattern_lower, pattern_sanitize = pattern
+    #             if pattern in line or pattern_lower in line or pattern_sanitize in line:
+    #                 matches.append((line_i, line, rule))
+    #     line_i+=1
+    #
+    # # Print any matches with context, if there are any.
+    #
+    # print_strs = []
+    # for line_i, line, (label, is_regex, pattern,context_pattern) in matches:
+    #     if is_regex:
+    #         print_strs.append(f"\t{pattern} match:{colored(re.findall(pattern, line), 'red')}")
+    #     else:
+    #         pattern, pattern_lower, pattern_sanitize = pattern
+    #         s = ""
+    #         if pattern in line:
+    #             p = pattern
+    #         elif pattern_lower in line:
+    #             p = pattern_lower
+    #         elif pattern_sanitize in line:
+    #             p = pattern_sanitize
+    #         idx = line.index(p)
+    #         if not is_known_noise(line, idx, p):
+    #             #s = f"\t{p} match:" + lines[idx - 80:idx] + colored(lines[idx:idx + len(p)], 'red') + lines[idx + len(p):idx + 80 + len(p)]
+    #             s = f"\t{p} match:" + line[max(idx - 80,0):idx] + colored(line[idx:(idx + len(p))], 'red') + line[(idx + len(p)):idx + 80 + len(p)]
+    #             s = s.replace('\r', ' ').replace('\n', ' ')
+    #             print_strs.append(s)
+    #     #print(f"MATCH FOUND: '{label}' with pattern '{pattern}' matched for filepath '{fpath}' on line {i}")
+    #
+    # if len(print_strs) > 0:
+    #     print()
+    #     print(f"MATCHES FOUND FOR FILEPATH {colored(fpath,'green')}:")
+    #     for print_str in print_strs:
+    #         print(print_str)
 
 
 
