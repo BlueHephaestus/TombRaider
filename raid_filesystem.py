@@ -1,10 +1,10 @@
 import sys
 import os
 import re
-from filesystem_utils import *
+from utils.filesystem_utils import *
 #from tqdm import tqdm
-from filter_utils import *
-from hash_utils import *
+from utils.filter_utils import *
+from utils.hash_utils import *
 import numpy as np
 from collections import defaultdict
 
@@ -75,7 +75,7 @@ def get_filetype_subdir(fname):
 def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, blacklist_fname=None):
 
     # Get optimal hashing buffer size to maximize speed for it
-    get_optimal_md5_buffer_size()
+    #get_optimal_md5_buffer_size()
 
     # Counts of what files we find
     subdir_counts = defaultdict(lambda:1) # Default values to 1
@@ -126,7 +126,12 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
     print(f"Raiding Testdisk and Photorec Recovered Filesystems and Creating Tomb Filesystem")
     # TODO rewrite this to be parallelized (will require running testdisk before photorec as a separate section)
     # since this should be relatively easy to parallelize and should push the bottleneck back to the disk.
-    for fpath in tqdm(fpaths(testdisk_root) + fpaths(photorec_root)):
+
+
+    filesystem_dir = "Filesystem/"
+    if not os.path.exists(filesystem_dir):
+        os.makedirs(filesystem_dir)
+    for fpath in tqdm(fpaths(testdisk_root)):
         # HASH CHECKS
         # First check if we can delete it
         # This will check both our list of knowns, and the one we've accumulated since the program started
@@ -139,8 +144,33 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
         # Else add to our list of founds.
         found_md5s.add(digest)
 
+        tomb_fpath = fpath
+        if "tomb/testdisk" in tomb_fpath:
+            tomb_fpath = re.sub('testdisk\/', filesystem_dir, tomb_fpath, count=1)
+
+        tomb_fpath = sanitize(tomb_fpath, sanitize_dirs=False)
+        # print(tomb_fpath, filesystem_dir)
+        # print(os.path.join(filesystem_dir, tomb_fpath))
+        safemv(fpath, tomb_fpath)
+        # print(os.path.join(filesystem_dir, tomb_fpath))
+        index[digest] = tomb_fpath
+
+    recovered_dir = "Recovered_Files"
+    if not os.path.exists(recovered_dir):
+        os.makedirs(recovered_dir)
+    for fpath in tqdm(fpaths(photorec_root)):
+        try:
+            digest = md5(fpath)
+        except:
+            continue
+        if isknown(digest) or isfound(digest):
+            os.remove(fpath)
+            continue
+        # Else add to our list of founds.
+        found_md5s.add(digest)
+
         # Get filetype
-        subdir = get_filetype_subdir(fpath)
+        subdir = os.path.join(recovered_dir, get_filetype_subdir(fpath))
         subdir_counts[subdir] += 1
 
         if subdir in blacklist:
@@ -152,6 +182,7 @@ def process(testdisk_root, photorec_root, filesystem_root, known_md5s_fname, bla
         if not os.path.isdir(subdir):
             os.mkdir(subdir)
         # # Store in index
+        # condensed_fpath= subdir + "/" + sanitize(localize(fpath, filesystem_root, tombroot=True))
         condensed_fpath= subdir + "/" + sanitize(localize(fpath, filesystem_root, tombroot=True))
         safemv(fpath, condensed_fpath)
         index[digest] = condensed_fpath

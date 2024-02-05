@@ -26,9 +26,9 @@ def fpaths(dir):
         for f in files:
             l.append(os.path.join(root,f))
             n += 1
-            #sys.stdout.write(f"\r{str(f'{n:,}').rjust(13)} files iterated")
-    #sys.stdout.flush()
-    #print()
+            sys.stdout.write(f"\r{str(f'{n:,}').rjust(13)} files iterated")
+    sys.stdout.flush()
+    print()
     return l
 
 def localize(fpath, root, tombroot=False):

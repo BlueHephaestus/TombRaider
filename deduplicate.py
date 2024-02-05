@@ -39,14 +39,18 @@ Additionally reducing the error rate for the bloom filter helps too.
 FUTURE IDEA is to incorporate a fixed size of index, and if it gets too big, we just start a new one.
 """
 
-def process(filesystem_root):
+def process(filesystem_roots):
+    # list of roots, may be one or more.
 
     # Get optimal hashing buffer size to maximize speed for it
     #get_optimal_md5_buffer_size()
 
     # Load bloom filter
     # bloom_filter = BloomFilter(max_elements=150_000_000, error_rate=0.001, filename=('known.bloom',-1), start_fresh=False) # 132 mil known hashes
-    fpath_iter = fpaths(filesystem_root)
+    print("Initialising Bloom Filter...")
+    fpath_iter = []
+    for fs in filesystem_roots:
+        fpath_iter.extend(fpaths(fs))
     bloom_filter = BloomFilter(max_elements=len(fpath_iter), error_rate=1e-9)
 
     # Load all hashes
@@ -86,7 +90,7 @@ def process(filesystem_root):
         # HASH CHECKS
         # First check if we can delete it based on the bloom filter
         # Most of the time we will not delete it since they're often not in the bloom filter
-        if not os.path.isfile(fpath):continue
+        if not is_regular_file(fpath):continue
         #if os.path.getsize(fpath) > 1e8: continue
         digest = fast_lossy_md5(fpath)
         size = os.path.getsize(fpath)
@@ -111,19 +115,17 @@ def process(filesystem_root):
         bloom_filter.add(digest)
         index[digest] = fpath
 
-    # OI FUTURE SELF
-    # WE JUST REALIZED THE CHECK WAS WRONG. REDO ALL THE BLOOM FILTER TESTS TO SEE IF IT IS BETTER NOW.
     print("Writing index to disk...")
-    write_index(index, filesystem_root + "/" + "filesystem.index")
+    for fs in filesystem_roots:
+        write_index(index, fs + "/" + "filesystem.index")
     print(f"Removed {removed}/{total} files ({(removed/total)*100:.2f}%) totalling {removed_size/1e9:.2f}GB/{total_size/1e9:.2f}GB ({((removed_size/total_size))*100:.2f}% of total).")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python3 deduplicate.py filesystem_root/")
+    if len(sys.argv) < 2:
+        print("Usage: python3 deduplicate.py filesystem_root [optional]filesystem_root2/ ...")
 
-    filesystem_root = sys.argv[1]
-    # known_md5s_fname = sys.argv[2]
-    filesystem_root = addslash(filesystem_root)
-    process(filesystem_root)
+    # Handle multiple possible directories
+    filesystem_roots = [addslash(f) for f in sys.argv[1:]]
+    process(filesystem_roots)
 
 

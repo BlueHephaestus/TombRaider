@@ -81,7 +81,7 @@ echo_r() {
 }
 
 done=()
-excluded=("sda" "sdb" "sdc" "sdd" "sdl" "sdm" "sd" "nvme0n1")
+excluded=("sda" "sdb" "sdc" "sdd" "sde" "nvme0n1")
 
 #      # Mount device
 #      echo "Mounting /dev/$device"
@@ -101,7 +101,8 @@ raid_device(){
   device_name=$2
   device_path=$3
 
-  device_port=$(get_device_port $device)
+#  device_port=$(get_device_port $device)
+  device_port=$device
 
   original_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   device_path="/dev/$device"
@@ -176,7 +177,8 @@ while true; do
     if [[ ! " ${excluded[@]} " =~ " $device " && ! " ${done[@]} " =~ "$device_name" ]]; then
 
       original_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-      device_port=$(get_device_port $device)
+      #device_port=$(get_device_port $device)
+      device_port=$device
 
       # Check if the device port is already in the list
       touch "$original_dir/running_devices.txt"
